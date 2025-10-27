@@ -1,0 +1,47 @@
+{
+    "$schema": "https://cdn.statically.io/gh/nguyenngoclongdev/cdn/main/schema/v11/terminal-keeper.json",
+    "theme": "tribe",
+    "active": "default",
+    "activateOnStartup": true,
+    "keepExistingTerminals": false,
+    "sessions": {
+        "default": [
+            {
+                "name": "any",
+                "icon": "person",
+                "color": "terminal.ansiGreen"
+            },
+            {
+                "name": "db",
+                "autoExecuteCommands": true,
+                "commands": [
+                    "bun db"
+                ]
+            },
+            {
+                "name": "api",
+                "autoExecuteCommands": true,
+                "commands": [
+                    "bun api"
+                ]
+            },
+            {
+                "name": "start",
+                "autoExecuteCommands": false,
+                "commands": [
+                    "bun start"
+                ]
+            },
+            {
+                "name": "connect",
+                "autoExecuteCommands": false,
+                "commands": [
+                    "bun connect"
+                ]
+            }
+        ],
+        "saved-session": [
+            {}
+        ]
+    }
+}
