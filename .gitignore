@@ -1,0 +1,17 @@
+.env
+.next
+.turbo
+.vercel
+build
+dist
+logs
+*.dmp
+log.txt
+Thumbs.db
+.DS_Store
+.env.keys
+node_modules
+*.tsbuildinfo
+next-env.d.ts
+!apps/cli/src/app/server/build
+/target
