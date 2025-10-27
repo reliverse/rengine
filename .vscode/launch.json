@@ -1,0 +1,75 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Tauri App",
+      "cargo": {
+        "args": [
+          "build",
+          "--manifest-path=apps/rengine/src-tauri/Cargo.toml",
+          "--package=rengine"
+        ],
+        "filter": {
+          "name": "rengine",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/apps/rengine/src-tauri"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Tauri Tests",
+      "cargo": {
+        "args": [
+          "test",
+          "--manifest-path=apps/rengine/src-tauri/Cargo.toml",
+          "--package=rengine"
+        ],
+        "filter": {
+          "name": "rengine",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/apps/rengine/src-tauri"
+    },
+    {
+      "name": "BetterRadar: Debug (CMake)",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/sdk/gtasa/src-mods/BetterRadar/build/bin/Debug/BetterRadar.SA.asi",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "BetterRadar: Build (Debug)"
+    },
+    {
+      "name": "PluginSDK: Debug plugin_sa",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/sdk/gtasa/plugin-sdk/output/bin/Debug/plugin_sa.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/apps/sdk/gtasa/plugin-sdk",
+      "preLaunchTask": "PluginSDK: Build plugin_sa (zDebug)"
+    },
+    {
+      "name": "Launch GTA:SA (provide path)",
+      "type": "bun",
+      "request": "launch",
+      "program": "${input:gtaPath}",
+      "cwd": "${workspaceFolder}",
+      "args": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "gtaPath",
+      "type": "promptString",
+      "description": "Path to gta_sa.exe",
+      "default": "C:/B/G/GTA/SA/gta_sa.exe"
+    }
+  ]
+}
