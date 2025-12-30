@@ -1,6 +1,5 @@
 import { Moon, Sun } from "lucide-react";
-import { forwardRef, useImperativeHandle, useRef } from "react";
-import { useTheme } from "~/components/providers/theme-provider";
+import { useTheme } from "~/components/theme-provider";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -9,34 +8,71 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 
-export interface ModeToggleRef {
-  toggleTheme: () => void;
+interface ModeToggleProps {
+  variant?: "icon" | "button";
 }
 
-export const ModeToggle = ({ ref, ..._props }) => {
-  const { setTheme, theme } = useTheme();
-  const triggerRef = useRef<HTMLButtonElement>(null);
+export function ModeToggle({ variant = "icon" }: ModeToggleProps) {
+  const { theme, setTheme } = useTheme();
 
-  useImperativeHandle(ref, () => ({
-    toggleTheme: () => {
-      setTheme(theme === "light" ? "dark" : "light");
-    },
-  }));
+  const getThemeLabel = () => {
+    switch (theme) {
+      case "light":
+        return "Light";
+      case "dark":
+        return "Dark";
+      case "system":
+        return "System";
+      default:
+        return "Light";
+    }
+  };
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button ref={triggerRef} size="icon" variant="outline">
-          <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-          <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            className={variant === "icon" ? "relative" : ""}
+            size={variant === "icon" ? "icon" : "default"}
+            variant="outline"
+          >
+            {variant === "icon" ? (
+              <>
+                <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">Toggle theme</span>
+              </>
+            ) : (
+              <span className="flex items-center gap-2">
+                {(() => {
+                  if (theme === "light") {
+                    return <Sun className="h-4 w-4" />;
+                  }
+                  if (theme === "dark") {
+                    return <Moon className="h-4 w-4" />;
+                  }
+                  return (
+                    <div className="h-4 w-4 rounded-full border-2 border-current" />
+                  );
+                })()}
+                {getThemeLabel()}
+              </span>
+            )}
+          </Button>
+        }
+      />
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          Light
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          Dark
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
+          System
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
-};
+}
