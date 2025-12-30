@@ -1,17 +1,36 @@
-.env
-.next
-.turbo
-.vercel
-build
-dist
+# Temp
+temp/
+tmp/
 logs
-*.dmp
-log.txt
-Thumbs.db
-.DS_Store
-.env.keys
+*.log
+
+# TanStack
 node_modules
-*.tsbuildinfo
-next-env.d.ts
-!apps/cli/src/app/server/build
-/target
+.DS_Store
+dist
+dist-ssr
+count.txt
+.nitro
+.tanstack
+.wrangler
+mcp-todos.json.output
+.vinxi
+todos.json
+*.local
+
+# Editor directories and files
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Env
+.env
+.env.local
+
+# React Router
+/.react-router/
+/build/
