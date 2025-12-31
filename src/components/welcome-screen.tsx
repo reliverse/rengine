@@ -165,7 +165,7 @@ export function WelcomeScreen() {
     setSelectedTemplate(template.id);
     template.setupScene();
     setTimeout(() => {
-      navigate({ to: "/editor" });
+      navigate({ to: "/" });
     }, 300);
   };
 
@@ -180,7 +180,7 @@ export function WelcomeScreen() {
       });
       sceneState.setCurrentFilePath(null);
 
-      navigate({ to: "/editor" });
+      navigate({ to: "/" });
     } else if (result.error !== "Load cancelled") {
       console.error("Load failed:", result.error);
     }
@@ -207,7 +207,7 @@ export function WelcomeScreen() {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background p-8">
       <div className="w-full max-w-6xl">
         <div className="mb-12 text-center">
-          <h1 className="mb-4 bg-linear-to-r from-primary to-primary/60 bg-clip-text font-bold text-4xl text-transparent">
+          <h1 className="mb-4 cursor-pointer bg-linear-to-r from-primary to-primary/60 bg-clip-text font-bold text-4xl text-transparent transition-all duration-300 hover:scale-110 hover:from-primary/80 hover:to-primary hover:shadow-2xl">
             Rengine
           </h1>
           <p className="text-muted-foreground text-xl">Game Engine</p>

@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
+import { documentDir, homeDir, join, tempDir } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
-import { readFile } from "@tauri-apps/plugin-fs";
+import { mkdir, readFile } from "@tauri-apps/plugin-fs";
 import {
   Box,
   Circle,
@@ -16,8 +17,10 @@ import {
   Scaling,
   Square,
   Sun,
+  Upload,
 } from "lucide-react";
 import { useState } from "react";
+import { ExportDialog } from "~/components/export-dialog";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -61,8 +64,70 @@ export function Toolbar() {
     null
   );
   const [isImporting, setIsImporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Get auto-save directory path and ensure it exists
+  const getAutoSaveDir = async (): Promise<string> => {
+    const home = await homeDir();
+    const autoSaveDir = await join(home, ".reliverse", "rengine", "projects");
+
+    // Try primary directory first
+    try {
+      console.log("Creating primary auto-save directory:", autoSaveDir);
+      await mkdir(autoSaveDir, { recursive: true });
+      console.log(
+        "✅ Primary auto-save directory created/verified:",
+        autoSaveDir
+      );
+      return autoSaveDir;
+    } catch (error) {
+      console.warn("❌ Failed to create primary auto-save directory:", error);
+    }
+
+    // Fallback to documents directory
+    try {
+      const documents = await documentDir();
+      const fallbackDir = await join(documents, "Rengine", "Projects");
+
+      console.log("Trying fallback auto-save directory:", fallbackDir);
+      await mkdir(fallbackDir, { recursive: true });
+      console.log(
+        "✅ Fallback auto-save directory created/verified:",
+        fallbackDir
+      );
+      return fallbackDir;
+    } catch (error) {
+      console.warn("❌ Failed to create fallback auto-save directory:", error);
+    }
+
+    // Last resort: temp directory
+    try {
+      const temp = await tempDir();
+      const tempDirPath = await join(temp, "rengine-autosave");
+
+      console.log("Using temp directory as last resort:", tempDirPath);
+      await mkdir(tempDirPath, { recursive: true });
+      console.log("✅ Temp auto-save directory created:", tempDirPath);
+      return tempDirPath;
+    } catch (error) {
+      console.error(
+        "❌ All auto-save directory creation attempts failed:",
+        error
+      );
+      throw new Error(
+        "Could not create any auto-save directory. Please check file system permissions."
+      );
+    }
+  };
+
+  // Generate auto-save filename
+  const generateAutoSaveFilename = (): string => {
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-");
+    return `auto_${timestamp}.rengine`;
+  };
 
   const {
     activeTool,
@@ -138,11 +203,14 @@ export function Toolbar() {
           if (result.success && result.object) {
             useSceneStore.getState().addObject(result.object);
 
-            toast({
-              title: "Model imported successfully",
-              description: `${result.object.name} has been added to the scene.`,
-              duration: 3000,
-            });
+            // Delay toast to prevent potential state conflicts
+            setTimeout(() => {
+              toast({
+                title: "Model imported successfully",
+                description: `${result.object?.name ?? "Model"} has been added to the scene.`,
+                duration: 3000,
+              });
+            }, 100);
 
             if (result.warnings && result.warnings.length > 0) {
               setTimeout(() => {
@@ -155,42 +223,106 @@ export function Toolbar() {
               }, 1000);
             }
           } else {
-            toast({
-              title: "Import failed",
-              description: result.error || "Unknown error occurred",
-              variant: "destructive",
-              duration: 5000,
-            });
+            // Delay error toast
+            setTimeout(() => {
+              toast({
+                title: "Import failed",
+                description: result.error || "Unknown error occurred",
+                variant: "destructive",
+                duration: 5000,
+              });
+            }, 100);
           }
         } catch (error) {
           setImportProgress(null);
           console.error("Import error:", error);
-          toast({
-            title: "Import failed",
-            description:
-              error instanceof Error ? error.message : "Unknown error occurred",
-            variant: "destructive",
-            duration: 5000,
-          });
+          setTimeout(() => {
+            toast({
+              title: "Import failed",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Unknown error occurred",
+              variant: "destructive",
+              duration: 5000,
+            });
+          }, 100);
         }
       }
     } catch (error) {
       setImportProgress(null);
       console.error("Import error:", error);
-      toast({
-        title: "Import failed",
-        description: "Failed to open file dialog",
-        variant: "destructive",
-        duration: 5000,
-      });
+      setTimeout(() => {
+        toast({
+          title: "Import failed",
+          description: "Failed to open file dialog",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }, 100);
     } finally {
       setIsImporting(false);
       setImportProgress(null);
     }
   };
 
-  const handleNewFile = () => {
-    navigate({ to: "/" });
+  const handleNewFile = async () => {
+    try {
+      // Create a new basic scene immediately
+      const sceneState = useSceneStore.getState();
+      sceneState.clearScene();
+      sceneState.addObject("cube", [0, 0, 0]);
+      sceneState.setCameraPosition([5, 5, 5]);
+      sceneState.setCameraTarget([0, 0, 0]);
+      sceneState.setSceneMetadata({
+        name: "Untitled Scene",
+        isModified: false,
+      });
+
+      // Auto-save the new project
+      const autoSaveDir = await getAutoSaveDir();
+      const fileName = generateAutoSaveFilename();
+      const filePath = await join(autoSaveDir, fileName);
+
+      const result = await saveScene(sceneState, filePath, {
+        name: "Untitled Scene",
+        description: "Auto-saved new project",
+      });
+
+      if (result.success) {
+        sceneState.setCurrentFilePath(filePath);
+        sceneState.markSceneSaved();
+
+        // Delay toast to prevent potential state conflicts
+        setTimeout(() => {
+          toast({
+            title: "New project created",
+            description: `Started a new scene with a basic cube. Auto-saved to ${fileName}`,
+            duration: 3000,
+          });
+        }, 100);
+      } else {
+        // If auto-save fails, still show success but warn about save issue
+        setTimeout(() => {
+          toast({
+            title: "New project created",
+            description:
+              "Started a new scene with a basic cube. (Auto-save failed)",
+            duration: 3000,
+          });
+        }, 100);
+      }
+    } catch (error) {
+      console.error("Error creating new project:", error);
+      setTimeout(() => {
+        toast({
+          title: "Error creating project",
+          description: "Failed to create new project",
+          variant: "destructive",
+          duration: 4000,
+        });
+      }, 100);
+    }
   };
 
   const handleSave = async () => {
@@ -199,18 +331,24 @@ export function Toolbar() {
 
     if (result.success) {
       sceneState.markSceneSaved();
-      toast({
-        title: "Scene saved",
-        description: "Your scene has been saved successfully.",
-        duration: 2000,
-      });
+      // Delay toast to prevent potential state conflicts
+      setTimeout(() => {
+        toast({
+          title: "Scene saved",
+          description: "Your scene has been saved successfully.",
+          duration: 2000,
+        });
+      }, 100);
     } else {
-      toast({
-        title: "Save failed",
-        description: result.error || "Failed to save scene",
-        variant: "destructive",
-        duration: 4000,
-      });
+      // Delay error toast as well
+      setTimeout(() => {
+        toast({
+          title: "Save failed",
+          description: result.error || "Failed to save scene",
+          variant: "destructive",
+          duration: 4000,
+        });
+      }, 100);
     }
   };
 
@@ -225,25 +363,38 @@ export function Toolbar() {
       });
       sceneState.setCurrentFilePath(null);
 
-      toast({
-        title: "Scene loaded",
-        description: `"${result.data.metadata.name}" has been loaded successfully.`,
-        duration: 2000,
-      });
+      // Delay toast to prevent potential state conflicts
+      setTimeout(() => {
+        toast({
+          title: "Scene loaded",
+          description: `"${result.data?.metadata?.name ?? "Scene"}" has been loaded successfully.`,
+          duration: 2000,
+        });
+      }, 100);
     } else if (result.error !== "Load cancelled") {
-      toast({
-        title: "Load failed",
-        description: result.error || "Failed to load scene",
-        variant: "destructive",
-        duration: 4000,
-      });
+      // Delay error toast as well
+      setTimeout(() => {
+        toast({
+          title: "Load failed",
+          description: result.error || "Failed to load scene",
+          variant: "destructive",
+          duration: 4000,
+        });
+      }, 100);
     }
   };
 
   return (
     <div className="flex items-center gap-2 border-b bg-background p-2">
       <div className="flex items-center gap-2 px-3">
-        <span className="font-bold text-lg">Rengine</span>
+        <Button
+          className="h-auto p-0 font-bold text-lg transition-all duration-300 hover:scale-105 hover:bg-transparent hover:text-primary hover:shadow-lg"
+          onClick={() => navigate({ to: "/welcome" })}
+          title="Go to Welcome Screen"
+          variant="ghost"
+        >
+          Rengine
+        </Button>
       </div>
 
       <Separator className="h-6" orientation="vertical" />
@@ -449,6 +600,17 @@ export function Toolbar() {
             </span>
           </div>
         )}
+
+        <Button
+          className="h-8 px-3"
+          onClick={() => setExportDialogOpen(true)}
+          size="sm"
+          title="Export Scene"
+          variant="ghost"
+        >
+          <Upload className="mr-2 h-4 w-4" />
+          Export
+        </Button>
       </div>
 
       <Separator className="h-6" orientation="vertical" />
@@ -471,6 +633,11 @@ export function Toolbar() {
           Clear Scene
         </Button>
       </div>
+
+      <ExportDialog
+        onOpenChange={setExportDialogOpen}
+        open={exportDialogOpen}
+      />
     </div>
   );
 }

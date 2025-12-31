@@ -55,6 +55,7 @@ export interface SceneObject {
   material?: THREE.Material;
   importedModel?: THREE.Object3D;
   initialScale?: number; // For imported models, stores the initial scaling factor
+  modelid?: number; // SAMP model ID for export
 }
 
 export interface SceneState {
@@ -239,7 +240,7 @@ const createDefaultLight = (
 export const useSceneStore = create<SceneState & SceneActions>()(
   subscribeWithSelector((set, get) => ({
     // Initial state
-    objects: [],
+    objects: [createDefaultObject("cube", [0, 0, 0])],
     lights: [
       createDefaultLight("ambient", [0, 0, 0]),
       createDefaultLight("directional", [10, 10, 5]),

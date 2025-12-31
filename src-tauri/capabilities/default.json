@@ -7,8 +7,27 @@
     "core:default",
     "dialog:allow-open",
     "dialog:allow-save",
-    "fs:read-all",
-    "fs:write-all",
+    "fs:allow-read-dir",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-mkdir",
+    "fs:allow-exists",
+    "fs:allow-write-text-file",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "$HOME",
+        "$HOME/**",
+        "$DOCUMENT",
+        "$DOCUMENT/**",
+        "$TEMP",
+        "$TEMP/**",
+        "$APPDATA",
+        "$APPDATA/**",
+        "$DESKTOP",
+        "$DESKTOP/**"
+      ]
+    },
     "core:window:default",
     "core:window:allow-start-dragging",
     "window-state:default"

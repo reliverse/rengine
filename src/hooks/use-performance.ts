@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePrecision } from "~/stores/settings-store";
 
 // Performance monitoring hook
 export function usePerformanceMonitor(componentName: string, enabled = true) {
   const renderCount = useRef(0);
   const lastRenderTime = useRef(Date.now());
   const renderTimes = useRef<number[]>([]);
+  const precision = usePrecision();
 
   useEffect(() => {
     if (!enabled) {
@@ -30,7 +32,7 @@ export function usePerformanceMonitor(componentName: string, enabled = true) {
         renderTimes.current.length;
       console.log(`${componentName} performance:`, {
         renders: renderCount.current,
-        avgRenderTime: `${avgRenderTime.toFixed(2)}ms`,
+        avgRenderTime: `${avgRenderTime.toFixed(precision)}ms`,
         lastRenderTime: `${renderTime}ms`,
       });
     }

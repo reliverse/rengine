@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { RengineEditor } from "~/components/rengine-editor";
 
 export const Route = createFileRoute("/")({
   component: RengineHome,
 });
 
 function RengineHome() {
-  // WelcomeScreen is now handled in the root route for full-screen rendering
-  return null;
+  return <RengineEditor />;
 }
