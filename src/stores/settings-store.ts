@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { DEFAULT_PRECISION } from "~/lib/defaults";
 
 export interface SettingsState {
   precision: number;
@@ -13,7 +14,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
   persist(
     (set) => ({
       // Default precision
-      precision: 4,
+      precision: DEFAULT_PRECISION,
 
       setPrecision: (precision: number) => {
         set({ precision: Math.max(0, Math.min(10, precision)) }); // Clamp between 0-10

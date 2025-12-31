@@ -36,6 +36,7 @@ import { type TransformTool, useSceneStore } from "~/stores/scene-store";
 import { getPresetList } from "~/utils/lighting-presets";
 import { type ImportProgress, modelImporter } from "~/utils/model-import";
 import { loadScene, saveScene } from "~/utils/scene-persistence";
+import type { SidebarContext } from "./unified-sidebar";
 
 const toolIcons = {
   select: MousePointer,
@@ -59,7 +60,15 @@ function getMimeType(fileName: string): string {
   }
 }
 
-export function Toolbar() {
+interface ToolbarProps {
+  rightSidebarContext: SidebarContext;
+  setRightSidebarContext: (context: SidebarContext) => void;
+}
+
+export function Toolbar({
+  rightSidebarContext,
+  setRightSidebarContext,
+}: ToolbarProps) {
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(
     null
   );
@@ -394,6 +403,28 @@ export function Toolbar() {
           variant="ghost"
         >
           Rengine
+        </Button>
+        <Button
+          className={cn(
+            "h-auto p-0 font-medium text-sm hover:bg-transparent hover:text-primary",
+            rightSidebarContext === "lighting" && "text-primary"
+          )}
+          onClick={() => setRightSidebarContext("lighting")}
+          title="Lighting Panel"
+          variant="ghost"
+        >
+          Lighting
+        </Button>
+        <Button
+          className={cn(
+            "h-auto p-0 font-medium text-sm hover:bg-transparent hover:text-primary",
+            rightSidebarContext === "tools" && "text-primary"
+          )}
+          onClick={() => setRightSidebarContext("tools")}
+          title="Tools Panel"
+          variant="ghost"
+        >
+          Tools
         </Button>
       </div>
 

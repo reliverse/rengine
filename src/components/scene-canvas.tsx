@@ -3,9 +3,11 @@ import {
   GizmoViewport,
   Grid,
   OrbitControls,
+  Stats,
 } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 import { Plane, Raycaster, Vector2, Vector3 } from "three";
 import { useToast } from "~/hooks/use-toast";
 import { cn } from "~/lib/utils";
@@ -127,7 +129,7 @@ function MouseInteraction({
 
 // biome-ignore lint/suspicious/noExplicitAny: OrbitControls typing is complex
 function Scene({ controlsRef }: { controlsRef: React.RefObject<any> }) {
-  const { gridVisible, gridSize } = useSceneStore();
+  const { gridVisible, gridSize, axesVisible, statsVisible } = useSceneStore();
 
   return (
     <>
@@ -170,6 +172,10 @@ function Scene({ controlsRef }: { controlsRef: React.RefObject<any> }) {
           labelColor="black"
         />
       </GizmoHelper>
+
+      {/* Additional helpers */}
+      {axesVisible && <axesHelper args={[5]} />}
+      {statsVisible && <Stats />}
     </>
   );
 }
@@ -192,6 +198,11 @@ export function SceneCanvas() {
     setCameraPosition,
     setCameraTarget,
     transformDragging,
+    backgroundColor,
+    fogEnabled,
+    fogColor,
+    fogNear,
+    fogFar,
   } = useSceneStore();
   const [isDragOver, setIsDragOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -316,12 +327,13 @@ export function SceneCanvas() {
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag-drop area needs event handlers
     <div
       className={cn(
-        "relative h-full w-full bg-linear-to-b from-slate-900 to-slate-800",
+        "relative h-full w-full",
         isDragOver && "ring-2 ring-blue-500 ring-opacity-50"
       )}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      style={{ backgroundColor }}
     >
       {/* Drag overlay */}
       {isDragOver && (
@@ -348,11 +360,15 @@ export function SceneCanvas() {
           alpha: false,
           powerPreference: "high-performance",
         }}
-        onCreated={({ camera }) => {
+        onCreated={({ camera, scene }) => {
           camera.lookAt(...cameraTarget);
+          // Set scene background color
+          scene.background = new THREE.Color(backgroundColor);
         }}
         shadows
       >
+        {/* Fog */}
+        {fogEnabled && <fog args={[fogColor, fogNear, fogFar]} attach="fog" />}
         <Suspense fallback={null}>
           <Scene controlsRef={controlsRef} />
           <OrbitControls

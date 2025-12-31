@@ -1,0 +1,3 @@
+# Entity inspector
+
+- [ ] Entity inspector
