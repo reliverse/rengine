@@ -1,9 +1,10 @@
 import { LightPropertyPanel } from "~/components/light-property-panel";
 import { PropertyPanel } from "~/components/property-panel";
 import { useSelectedLight } from "~/stores/scene-store";
+import { LightingPanel } from "./lighting-panel";
 import { SceneHierarchy } from "./scene-hierarchy";
 
-export type SidebarContext = "scene" | "tools" | "settings";
+export type SidebarContext = "scene" | "tools" | "lighting" | "settings";
 
 interface UnifiedSidebarProps {
   context: SidebarContext;
@@ -28,6 +29,10 @@ function ToolsSidebarContent() {
   );
 }
 
+function LightingSidebarContent() {
+  return <LightingPanel />;
+}
+
 function SettingsSidebarContent() {
   return (
     <div className="p-4">
@@ -46,6 +51,8 @@ export function UnifiedSidebar({ context, className }: UnifiedSidebarProps) {
         return <SceneSidebarContent />;
       case "tools":
         return <ToolsSidebarContent />;
+      case "lighting":
+        return <LightingSidebarContent />;
       case "settings":
         return <SettingsSidebarContent />;
       default:

@@ -1,13 +1,15 @@
 import { documentDir, homeDir, join, tempDir } from "@tauri-apps/api/path";
 import { mkdir } from "@tauri-apps/plugin-fs";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSceneStore } from "~/stores/scene-store";
 import { saveScene } from "~/utils/scene-persistence";
 import { SceneCanvas } from "./scene-canvas";
 import { Toolbar } from "./toolbar";
-import { UnifiedSidebar } from "./unified-sidebar";
+import { type SidebarContext, UnifiedSidebar } from "./unified-sidebar";
 
 export function RengineEditor() {
+  const [rightSidebarContext, setRightSidebarContext] =
+    useState<SidebarContext>("tools");
   // Auto-save initial scene on first mount
   useEffect(() => {
     const autoSaveInitialScene = async () => {
@@ -101,7 +103,10 @@ export function RengineEditor() {
   return (
     <div className="flex h-screen flex-col bg-background">
       {/* Toolbar */}
-      <Toolbar />
+      <Toolbar
+        rightSidebarContext={rightSidebarContext}
+        setRightSidebarContext={setRightSidebarContext}
+      />
 
       {/* Main Editor Area */}
       <div className="flex flex-1 overflow-hidden">
@@ -114,7 +119,7 @@ export function RengineEditor() {
         </div>
 
         {/* Right Sidebar - Properties/Tools */}
-        <UnifiedSidebar context="tools" />
+        <UnifiedSidebar context={rightSidebarContext} />
       </div>
     </div>
   );

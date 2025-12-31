@@ -1,0 +1,3 @@
+# Skeletal animation
+
+- [ ] Skeletal animation

@@ -1,6 +1,16 @@
 import type * as THREE from "three";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+import {
+  CAMERA_DEFAULTS,
+  DIRECTIONAL_LIGHT_DEFAULTS,
+  GRID_DEFAULTS,
+  OBJECT_DEFAULTS,
+  PLACEMENT_DEFAULTS,
+  SCENE_METADATA_DEFAULTS,
+  TOOL_DEFAULTS,
+  UI_DEFAULTS,
+} from "~/lib/defaults";
 import { applyLightingPreset } from "~/utils/lighting-presets";
 
 export type TransformTool = "select" | "move" | "rotate" | "scale";
@@ -76,6 +86,18 @@ export interface SceneState {
   };
   lightsVisible: boolean;
   transformDragging: boolean; // Track when transform controls are being dragged
+
+  // Environment settings
+  backgroundColor: string;
+  fogEnabled: boolean;
+  fogColor: string;
+  fogNear: number;
+  fogFar: number;
+
+  // Scene helpers
+  axesVisible: boolean;
+  statsVisible: boolean;
+
   // File management
   currentFilePath: string | null;
   sceneMetadata: {
@@ -97,10 +119,14 @@ export interface SceneActions {
   duplicateObject: (id: string) => void;
 
   // Light management
-  addLight: (type: LightType, position?: [number, number, number]) => void;
+  addLight: (
+    typeOrLight: LightType | Omit<SceneLight, "id" | "name">,
+    position?: [number, number, number]
+  ) => void;
   removeLight: (id: string) => void;
   updateLight: (id: string, updates: Partial<SceneLight>) => void;
   duplicateLight: (id: string) => void;
+  clearLights: () => void;
 
   // Selection
   selectObject: (id: string, multiSelect?: boolean) => void;
@@ -125,6 +151,17 @@ export interface SceneActions {
   setLightsVisible: (visible: boolean) => void;
   applyLightingPreset: (presetId: string) => void;
 
+  // Environment
+  setBackgroundColor: (color: string) => void;
+  setFogEnabled: (enabled: boolean) => void;
+  setFogColor: (color: string) => void;
+  setFogNear: (near: number) => void;
+  setFogFar: (far: number) => void;
+
+  // Scene helpers
+  setAxesVisible: (visible: boolean) => void;
+  setStatsVisible: (visible: boolean) => void;
+
   // Scene management
   clearScene: () => void;
 
@@ -144,15 +181,15 @@ export interface SceneActions {
 
 const createDefaultObject = (
   type: SceneObject["type"],
-  position: [number, number, number] = [0, 0, 0]
+  position: [number, number, number] = OBJECT_DEFAULTS.POSITION
 ): SceneObject => {
   const baseObject: Omit<SceneObject, "id" | "name"> = {
     type,
     position,
-    rotation: [0, 0, 0],
-    scale: [1, 1, 1],
-    color: "#ffffff",
-    visible: true,
+    rotation: OBJECT_DEFAULTS.ROTATION,
+    scale: OBJECT_DEFAULTS.SCALE,
+    color: OBJECT_DEFAULTS.COLOR,
+    visible: OBJECT_DEFAULTS.VISIBLE,
   };
 
   return {
@@ -247,24 +284,29 @@ export const useSceneStore = create<SceneState & SceneActions>()(
     ],
     selectedObjectIds: [],
     selectedLightIds: [],
-    activeTool: "select",
-    cameraPosition: [5, 5, 5],
-    cameraTarget: [0, 0, 0],
-    gridVisible: true,
-    snapToGrid: false,
-    gridSize: 1,
-    placementMode: {
-      active: false,
-      objectType: null,
-      previewPosition: null,
-    },
-    lightsVisible: true,
-    transformDragging: false,
+    activeTool: TOOL_DEFAULTS.ACTIVE_TOOL,
+    cameraPosition: CAMERA_DEFAULTS.POSITION,
+    cameraTarget: CAMERA_DEFAULTS.TARGET,
+    gridVisible: GRID_DEFAULTS.VISIBLE,
+    snapToGrid: GRID_DEFAULTS.SNAP_TO_GRID,
+    gridSize: GRID_DEFAULTS.SIZE,
+    placementMode: PLACEMENT_DEFAULTS,
+    lightsVisible: UI_DEFAULTS.LIGHTS_VISIBLE,
+    transformDragging: UI_DEFAULTS.TRANSFORM_DRAGGING,
+
+    // Environment defaults
+    backgroundColor: "#1e293b", // slate-800
+    fogEnabled: false,
+    fogColor: "#1e293b",
+    fogNear: 1,
+    fogFar: 100,
+
+    // Scene helpers defaults
+    axesVisible: true,
+    statsVisible: true,
+
     currentFilePath: null,
-    sceneMetadata: {
-      name: "Untitled Scene",
-      isModified: false,
-    },
+    sceneMetadata: SCENE_METADATA_DEFAULTS,
 
     // Actions
     addObject: (typeOrObject, position) => {
@@ -333,14 +375,35 @@ export const useSceneStore = create<SceneState & SceneActions>()(
     },
 
     // Light management actions
-    addLight: (type, position) => {
-      const newLight = createDefaultLight(type, position);
+    addLight: (typeOrLight, position) => {
+      let newLight: SceneLight;
+
+      if (typeof typeOrLight === "string") {
+        // Create a new light from type
+        newLight = createDefaultLight(typeOrLight, position);
+      } else {
+        // Use the provided light object
+        newLight = {
+          ...typeOrLight,
+          id: `light_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: `${typeOrLight.type.charAt(0).toUpperCase() + typeOrLight.type.slice(1)} Light ${Date.now()}`,
+        };
+      }
+
       set((state) => ({
         lights: [...state.lights, newLight],
         selectedLightIds: [newLight.id],
         selectedObjectIds: [], // Clear object selection when selecting light
       }));
 
+      get().markSceneModified();
+    },
+
+    clearLights: () => {
+      set({
+        lights: [],
+        selectedLightIds: [],
+      });
       get().markSceneModified();
     },
 
@@ -503,12 +566,47 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       }
     },
 
+    // Environment actions
+    setBackgroundColor: (color) => {
+      set({ backgroundColor: color });
+      get().markSceneModified();
+    },
+    setFogEnabled: (enabled) => {
+      set({ fogEnabled: enabled });
+      get().markSceneModified();
+    },
+    setFogColor: (color) => {
+      set({ fogColor: color });
+      get().markSceneModified();
+    },
+    setFogNear: (near) => {
+      set({ fogNear: near });
+      get().markSceneModified();
+    },
+    setFogFar: (far) => {
+      set({ fogFar: far });
+      get().markSceneModified();
+    },
+
+    // Scene helpers actions
+    setAxesVisible: (visible) => {
+      set({ axesVisible: visible });
+      get().markSceneModified();
+    },
+    setStatsVisible: (visible) => {
+      set({ statsVisible: visible });
+      get().markSceneModified();
+    },
+
     clearScene: () => {
       set({
         objects: [],
         lights: [
           createDefaultLight("ambient", [0, 0, 0]),
-          createDefaultLight("directional", [10, 10, 5]),
+          createDefaultLight(
+            "directional",
+            DIRECTIONAL_LIGHT_DEFAULTS.POSITION
+          ),
         ],
         selectedObjectIds: [],
         selectedLightIds: [],

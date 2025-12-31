@@ -31,6 +31,12 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "performance": {
+        "noNamespaceImport": "off"
+      },
+      "style": {
+        "useBlockStatements": "off"
+      },
       "complexity": {
         "noExcessiveCognitiveComplexity": "off"
       }
