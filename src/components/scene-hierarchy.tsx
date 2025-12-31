@@ -98,15 +98,25 @@ function HierarchyItem({ object, level, searchTerm }: HierarchyItemProps) {
   return (
     <ContextMenu>
       <ContextMenuTrigger>
-        <button
+        {/* biome-ignore lint/a11y/useSemanticElements: ContextMenuTrigger requires div element */}
+        <div
           className={cn(
             "group flex w-full cursor-pointer items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent",
             isSelected && "bg-accent text-accent-foreground",
             isMatch && "bg-yellow-100 dark:bg-yellow-900"
           )}
           onClick={handleSelect}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              const multiSelect = e.ctrlKey || e.metaKey;
+              selectObject(object.id, multiSelect);
+            }
+          }}
+          role="button"
           style={{ paddingLeft: `${level * 12 + 8}px` }}
-          type="button"
+          tabIndex={0}
         >
           {/* Expand/Collapse for future grouping */}
           {hren ? (
@@ -157,7 +167,7 @@ function HierarchyItem({ object, level, searchTerm }: HierarchyItemProps) {
               {object.visible ? "Hide object" : "Show object"}
             </TooltipContent>
           </Tooltip>
-        </button>
+        </div>
       </ContextMenuTrigger>
 
       <ContextMenuContent>
@@ -246,15 +256,25 @@ function LightHierarchyItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger>
-        <button
+        {/* biome-ignore lint/a11y/useSemanticElements: ContextMenuTrigger requires div element */}
+        <div
           className={cn(
             "group flex w-full cursor-pointer items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent",
             isSelected && "bg-accent text-accent-foreground",
             isMatch && "bg-yellow-100 dark:bg-yellow-900"
           )}
           onClick={handleSelect}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              const multiSelect = e.ctrlKey || e.metaKey;
+              selectLight(light.id, multiSelect);
+            }
+          }}
+          role="button"
           style={{ paddingLeft: `${level * 12 + 8}px` }}
-          type="button"
+          tabIndex={0}
         >
           {/* Light Icon */}
           <span className="text-xs">{getLightIcon(light.type)}</span>
@@ -284,7 +304,7 @@ function LightHierarchyItem({
               {light.visible ? "Hide light" : "Show light"}
             </TooltipContent>
           </Tooltip>
-        </button>
+        </div>
       </ContextMenuTrigger>
 
       <ContextMenuContent>

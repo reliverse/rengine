@@ -6,12 +6,14 @@ import {
   useSelectedLight,
   useSelectedObject,
 } from "~/stores/scene-store";
+import { usePrecision } from "~/stores/settings-store";
 
 export function SceneTransformControls() {
   const { activeTool, updateObject, updateLight, setTransformDragging } =
     useSceneStore();
   const selectedObject = useSelectedObject();
   const selectedLight = useSelectedLight();
+  const precision = usePrecision();
   const transformControlsRef =
     useRef<React.ComponentRef<typeof TransformControls>>(null);
 
@@ -22,6 +24,10 @@ export function SceneTransformControls() {
     return null;
   }
 
+  const roundToPrecision = (value: number): number => {
+    return Number.parseFloat(value.toFixed(precision));
+  };
+
   const handleObjectChange = () => {
     if (!(transformControlsRef.current && target)) {
       return;
@@ -31,20 +37,32 @@ export function SceneTransformControls() {
 
     if (isLight) {
       updateLight(target.id, {
-        position: [newPosition[0], newPosition[1], newPosition[2]],
+        position: [
+          roundToPrecision(newPosition[0]),
+          roundToPrecision(newPosition[1]),
+          roundToPrecision(newPosition[2]),
+        ],
       });
     } else {
       const rotationArray = transformControlsRef.current.rotation.toArray();
       const scaleArray = transformControlsRef.current.scale.toArray();
 
       updateObject(target.id, {
-        position: [newPosition[0], newPosition[1], newPosition[2]],
-        rotation: [
-          (rotationArray[0] * 180) / Math.PI,
-          (rotationArray[1] * 180) / Math.PI,
-          (rotationArray[2] * 180) / Math.PI,
+        position: [
+          roundToPrecision(newPosition[0]),
+          roundToPrecision(newPosition[1]),
+          roundToPrecision(newPosition[2]),
         ],
-        scale: [scaleArray[0], scaleArray[1], scaleArray[2]],
+        rotation: [
+          roundToPrecision((rotationArray[0] * 180) / Math.PI),
+          roundToPrecision((rotationArray[1] * 180) / Math.PI),
+          roundToPrecision((rotationArray[2] * 180) / Math.PI),
+        ],
+        scale: [
+          roundToPrecision(scaleArray[0]),
+          roundToPrecision(scaleArray[1]),
+          roundToPrecision(scaleArray[2]),
+        ],
       });
     }
   };

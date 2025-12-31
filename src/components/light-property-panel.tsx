@@ -8,10 +8,13 @@ import { Slider } from "~/components/ui/slider";
 import { Switch } from "~/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSceneStore, useSelectedLight } from "~/stores/scene-store";
+import { usePrecision, useStepValue } from "~/stores/settings-store";
 
 export function LightPropertyPanel() {
   const selectedLight = useSelectedLight();
   const { updateLight, removeLight } = useSceneStore();
+  const precision = usePrecision();
+  const stepValue = useStepValue();
 
   if (!selectedLight) {
     return (
@@ -143,7 +146,7 @@ export function LightPropertyPanel() {
                   <div className="flex items-center justify-between">
                     <Label className="font-medium text-xs">Intensity</Label>
                     <span className="text-muted-foreground text-xs">
-                      {selectedLight.intensity.toFixed(2)}
+                      {selectedLight.intensity.toFixed(precision)}
                     </span>
                   </div>
                   <Slider
@@ -181,9 +184,11 @@ export function LightPropertyPanel() {
                             Number.parseFloat(e.target.value) || 0
                           )
                         }
-                        step="0.1"
+                        step={stepValue}
                         type="number"
-                        value={selectedLight.position[0] ?? 0}
+                        value={(selectedLight.position[0] ?? 0).toFixed(
+                          precision
+                        )}
                       />
                     </div>
                     <div>
@@ -202,9 +207,11 @@ export function LightPropertyPanel() {
                             Number.parseFloat(e.target.value) || 0
                           )
                         }
-                        step="0.1"
+                        step={stepValue}
                         type="number"
-                        value={selectedLight.position[1] ?? 0}
+                        value={(selectedLight.position[1] ?? 0).toFixed(
+                          precision
+                        )}
                       />
                     </div>
                     <div>
@@ -223,9 +230,11 @@ export function LightPropertyPanel() {
                             Number.parseFloat(e.target.value) || 0
                           )
                         }
-                        step="0.1"
+                        step={stepValue}
                         type="number"
-                        value={selectedLight.position[2] ?? 0}
+                        value={(selectedLight.position[2] ?? 0).toFixed(
+                          precision
+                        )}
                       />
                     </div>
                   </div>
@@ -254,9 +263,11 @@ export function LightPropertyPanel() {
                                 Number.parseFloat(e.target.value) || 0
                               )
                             }
-                            step="0.1"
+                            step={stepValue}
                             type="number"
-                            value={selectedLight.target?.[0] ?? 0}
+                            value={(selectedLight.target?.[0] ?? 0).toFixed(
+                              precision
+                            )}
                           />
                         </div>
                         <div>
@@ -275,9 +286,11 @@ export function LightPropertyPanel() {
                                 Number.parseFloat(e.target.value) || 0
                               )
                             }
-                            step="0.1"
+                            step={stepValue}
                             type="number"
-                            value={selectedLight.target?.[1] ?? 0}
+                            value={(selectedLight.target?.[1] ?? 0).toFixed(
+                              precision
+                            )}
                           />
                         </div>
                         <div>
@@ -296,9 +309,11 @@ export function LightPropertyPanel() {
                                 Number.parseFloat(e.target.value) || 0
                               )
                             }
-                            step="0.1"
+                            step={stepValue}
                             type="number"
-                            value={selectedLight.target?.[2] ?? 0}
+                            value={(selectedLight.target?.[2] ?? 0).toFixed(
+                              precision
+                            )}
                           />
                         </div>
                       </div>
@@ -374,7 +389,7 @@ export function LightPropertyPanel() {
                       <div className="flex items-center justify-between">
                         <Label className="font-medium text-xs">Decay</Label>
                         <span className="text-muted-foreground text-xs">
-                          {selectedLight.decay?.toFixed(2)}
+                          {selectedLight.decay?.toFixed(precision)}
                         </span>
                       </div>
                       <Slider
@@ -483,7 +498,7 @@ export function LightPropertyPanel() {
                       <div className="flex items-center justify-between">
                         <Label className="font-medium text-xs">Decay</Label>
                         <span className="text-muted-foreground text-xs">
-                          {selectedLight.decay?.toFixed(2)}
+                          {selectedLight.decay?.toFixed(precision)}
                         </span>
                       </div>
                       <Slider
@@ -606,7 +621,7 @@ export function LightPropertyPanel() {
                             Shadow Near
                           </Label>
                           <span className="text-muted-foreground text-xs">
-                            {selectedLight.shadowNear?.toFixed(2)}
+                            {selectedLight.shadowNear?.toFixed(precision)}
                           </span>
                         </div>
                         <Slider

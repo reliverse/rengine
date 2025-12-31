@@ -7,11 +7,14 @@ import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import { Switch } from "~/components/ui/switch";
 import { useSceneStore, useSelectedObject } from "~/stores/scene-store";
+import { usePrecision, useStepValue } from "~/stores/settings-store";
 
 export function PropertyPanel() {
   const selectedObject = useSelectedObject();
   const { updateObject } = useSceneStore();
   const [proportionalScale, setProportionalScale] = useState(false);
+  const stepValue = useStepValue();
+  const precision = usePrecision();
 
   if (!selectedObject) {
     return (
@@ -29,7 +32,7 @@ export function PropertyPanel() {
 
   const handlePropertyChange = (
     property: string,
-    value: string | number | boolean | [number, number, number]
+    value: string | number | boolean | [number, number, number] | undefined
   ) => {
     updateObject(selectedObject.id, { [property]: value });
   };
@@ -123,6 +126,29 @@ export function PropertyPanel() {
             </div>
           </div>
 
+          {/* Model ID */}
+          <div className="space-y-2">
+            <Label className="font-medium text-xs" htmlFor="model-id">
+              Model ID (SAMP)
+            </Label>
+            <Input
+              className="h-8"
+              id="model-id"
+              onChange={(e) => {
+                const value = e.target.value;
+                const numValue =
+                  value === "" ? undefined : Number.parseInt(value, 10);
+                handlePropertyChange("modelid", numValue);
+              }}
+              placeholder="Optional"
+              type="number"
+              value={selectedObject.modelid ?? ""}
+            />
+            <div className="text-muted-foreground text-xs">
+              Set this to export object to SAMP format
+            </div>
+          </div>
+
           <Separator />
 
           {/* Transform Properties */}
@@ -147,9 +173,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 0
                       )
                     }
-                    step="0.1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.position[0]}
+                    value={selectedObject.position[0].toFixed(precision)}
                   />
                 </div>
                 <div>
@@ -168,9 +194,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 0
                       )
                     }
-                    step="0.1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.position[1]}
+                    value={selectedObject.position[1].toFixed(precision)}
                   />
                 </div>
                 <div>
@@ -189,9 +215,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 0
                       )
                     }
-                    step="0.1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.position[2]}
+                    value={selectedObject.position[2].toFixed(precision)}
                   />
                 </div>
               </div>
@@ -217,9 +243,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 0
                       )
                     }
-                    step="1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.rotation[0]}
+                    value={selectedObject.rotation[0].toFixed(precision)}
                   />
                 </div>
                 <div>
@@ -238,9 +264,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 0
                       )
                     }
-                    step="1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.rotation[1]}
+                    value={selectedObject.rotation[1].toFixed(precision)}
                   />
                 </div>
                 <div>
@@ -259,9 +285,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 0
                       )
                     }
-                    step="1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.rotation[2]}
+                    value={selectedObject.rotation[2].toFixed(precision)}
                   />
                 </div>
               </div>
@@ -302,9 +328,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 1
                       )
                     }
-                    step="0.1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.scale[0]}
+                    value={selectedObject.scale[0].toFixed(precision)}
                   />
                 </div>
                 <div>
@@ -324,9 +350,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 1
                       )
                     }
-                    step="0.1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.scale[1]}
+                    value={selectedObject.scale[1].toFixed(precision)}
                   />
                 </div>
                 <div>
@@ -346,9 +372,9 @@ export function PropertyPanel() {
                         Number.parseFloat(e.target.value) || 1
                       )
                     }
-                    step="0.1"
+                    step={stepValue}
                     type="number"
-                    value={selectedObject.scale[2]}
+                    value={selectedObject.scale[2].toFixed(precision)}
                   />
                 </div>
               </div>

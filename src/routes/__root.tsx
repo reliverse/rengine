@@ -5,7 +5,6 @@ import {
 } from "@tanstack/react-router";
 import { MainLayout } from "~/components/main-layout";
 import { ToasterProvider } from "~/components/toaster";
-import { WelcomeScreen } from "~/components/welcome-screen";
 
 // import { TanStackDevtools } from "@tanstack/react-devtools";
 // import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
@@ -29,30 +28,6 @@ function RootComponent() {
   // Hide sidebar for specific routes (RengineEditor handles its own layout)
   const hideSidebarRoutes = ["/", "/editor", "/settings", "/auth", "/account"];
   const showSidebar = !hideSidebarRoutes.includes(location.pathname);
-
-  // For the home route, render WelcomeScreen full-screen without MainLayout
-  if (location.pathname === "/") {
-    return (
-      <div className="min-h-screen bg-background">
-        <WelcomeScreen />
-        <ToasterProvider />
-        {/* {isDevelopment && (
-          <TanStackDevtools
-            config={{
-              position: "bottom-right",
-            }}
-            plugins={[
-              {
-                name: "Tanstack Router",
-                render: <TanStackRouterDevtoolsPanel />,
-              },
-              TanStackQueryDevtools,
-            ]}
-          />
-        )} */}
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">

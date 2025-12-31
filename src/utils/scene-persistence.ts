@@ -251,6 +251,8 @@ export async function saveScene(
     const sceneData = serializeScene(sceneState, metadata);
     const jsonString = JSON.stringify(sceneData, null, 2);
 
+    // Add small delay before file write to prevent timing issues
+    await new Promise((resolve) => setTimeout(resolve, 50));
     await writeTextFile(savePath, jsonString);
 
     // Add to saved projects list for quick loading
