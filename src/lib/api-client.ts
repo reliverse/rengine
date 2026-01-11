@@ -885,7 +885,6 @@ export async function getTitleImage(
   }
 }
 
-// Create singleton instance with proper configuration
 const getApiState = (): ApiState => {
   // Use env.ts for type-safe environment variable access
   // In development, use the proxy to avoid CORS issues

@@ -1,21 +1,22 @@
 import { useStore } from "@tanstack/react-form";
+import type React from "react";
 import type { ReactNode } from "react";
 import { Button } from "~/components/ui/button";
 import { Field as UIField } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
-  Select as ShadcnSelect,
-  SelectContent as ShadcnSelectContent,
-  SelectGroup as ShadcnSelectGroup,
-  SelectItem as ShadcnSelectItem,
-  SelectLabel as ShadcnSelectLabel,
-  SelectTrigger as ShadcnSelectTrigger,
-  SelectValue as ShadcnSelectValue,
+  Select as InternalSelect,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
 } from "~/components/ui/select";
-import { Slider as ShadcnSlider } from "~/components/ui/slider";
-import { Switch as ShadcnSwitch } from "~/components/ui/switch";
-import { Textarea as ShadcnTextarea } from "~/components/ui/textarea";
+import { Slider as InternalSlider } from "~/components/ui/slider";
+import { Switch as InternalSwitch } from "~/components/ui/switch";
+import { Textarea as InternalTextarea } from "~/components/ui/textarea";
 import { useFieldContext, useFormContext } from "~/hooks/form-context";
 
 export function Field({ children }: { children: ReactNode }) {
@@ -95,10 +96,12 @@ export function TextArea({
       <Label className="mb-2 font-bold text-xl" htmlFor={label}>
         {label}
       </Label>
-      <ShadcnTextarea
+      <InternalTextarea
         id={label}
         onBlur={field.handleBlur}
-        onChange={(e) => field.handleChange(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+          field.handleChange(e.target.value)
+        }
         rows={rows}
         value={field.state.value}
       />
@@ -122,31 +125,31 @@ export function Select({
 
   return (
     <div>
-      <ShadcnSelect
+      <InternalSelect
         name={field.name}
         onValueChange={(value) => {
           field.handleChange(value ?? "");
         }}
         value={currentValue}
       >
-        <ShadcnSelectTrigger className="w-full">
-          <ShadcnSelectValue>
+        <SelectTrigger className="w-full">
+          <SelectValue>
             {currentValue
               ? values.find((v) => v.value === currentValue)?.label
               : placeholder}
-          </ShadcnSelectValue>
-        </ShadcnSelectTrigger>
-        <ShadcnSelectContent>
-          <ShadcnSelectGroup>
-            <ShadcnSelectLabel>{label}</ShadcnSelectLabel>
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectLabel>{label}</SelectLabel>
             {values.map((value) => (
-              <ShadcnSelectItem key={value.value} value={value.value}>
+              <SelectItem key={value.value} value={value.value}>
                 {value.label}
-              </ShadcnSelectItem>
+              </SelectItem>
             ))}
-          </ShadcnSelectGroup>
-        </ShadcnSelectContent>
-      </ShadcnSelect>
+          </SelectGroup>
+        </SelectContent>
+      </InternalSelect>
       {field.state.meta.isTouched && <ErrorMessages errors={errors} />}
     </div>
   );
@@ -161,7 +164,7 @@ export function Slider({ label }: { label: string }) {
       <Label className="mb-2 font-bold text-xl" htmlFor={label}>
         {label}
       </Label>
-      <ShadcnSlider
+      <InternalSlider
         id={label}
         onBlur={field.handleBlur}
         onValueChange={(value) =>
@@ -181,11 +184,11 @@ export function Switch({ label }: { label: string }) {
   return (
     <div>
       <div className="flex items-center gap-2">
-        <ShadcnSwitch
+        <InternalSwitch
           checked={field.state.value}
           id={label}
           onBlur={field.handleBlur}
-          onCheckedChange={(checked) => field.handleChange(checked)}
+          onCheckedChange={(checked: boolean) => field.handleChange(checked)}
         />
         <Label htmlFor={label}>{label}</Label>
       </div>

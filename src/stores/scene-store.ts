@@ -1,4 +1,4 @@
-import type * as THREE from "three";
+import * as THREE from "three";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import {
@@ -11,7 +11,10 @@ import {
   TOOL_DEFAULTS,
   UI_DEFAULTS,
 } from "~/lib/defaults";
+import { useMaterialStore } from "~/stores/material-store";
+import { clearPools } from "~/utils/geometry-pool";
 import { applyLightingPreset } from "~/utils/lighting-presets";
+import { clearModelCache } from "~/utils/model-import";
 
 export type TransformTool = "select" | "move" | "rotate" | "scale";
 
@@ -62,7 +65,8 @@ export interface SceneObject {
   color: string;
   visible: boolean;
   geometry?: THREE.BufferGeometry;
-  material?: THREE.Material;
+  materialId?: string; // Reference to material in material system
+  material?: THREE.Material; // Fallback for legacy compatibility
   importedModel?: THREE.Object3D;
   initialScale?: number; // For imported models, stores the initial scaling factor
   modelid?: number; // SAMP model ID for export
@@ -97,6 +101,9 @@ export interface SceneState {
   // Scene helpers
   axesVisible: boolean;
   statsVisible: boolean;
+
+  // Performance settings
+  performanceRegressionOnMove: boolean;
 
   // File management
   currentFilePath: string | null;
@@ -162,6 +169,9 @@ export interface SceneActions {
   setAxesVisible: (visible: boolean) => void;
   setStatsVisible: (visible: boolean) => void;
 
+  // Performance settings
+  setPerformanceRegressionOnMove: (enabled: boolean) => void;
+
   // Scene management
   clearScene: () => void;
 
@@ -177,6 +187,10 @@ export interface SceneActions {
   markSceneModified: () => void;
   markSceneSaved: () => void;
   loadScene: (sceneState: Partial<SceneState>) => void;
+
+  // Memory management
+  cleanupSceneResources: () => void;
+  forceGarbageCollection: () => void;
 }
 
 const createDefaultObject = (
@@ -194,8 +208,8 @@ const createDefaultObject = (
 
   return {
     ...baseObject,
-    id: `object_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${Date.now()}`,
+    id: `object_${Math.random().toString(36).substr(2, 9)}`,
+    name: `${type.charAt(0).toUpperCase()}${type.slice(1)}`,
   };
 };
 
@@ -222,8 +236,8 @@ const createDefaultLight = (
         shadowNear: 0.1,
         shadowFar: 100,
         shadowRadius: 8,
-        id: `light_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: `Directional Light ${Date.now()}`,
+        id: `light_${Math.random().toString(36).substr(2, 9)}`,
+        name: "Directional Light",
       };
     case "point":
       return {
@@ -235,8 +249,8 @@ const createDefaultLight = (
         shadowNear: 0.1,
         shadowFar: 50,
         shadowRadius: 4,
-        id: `light_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: `Point Light ${Date.now()}`,
+        id: `light_${Math.random().toString(36).substr(2, 9)}`,
+        name: "Point Light",
       };
     case "spot":
       return {
@@ -251,23 +265,23 @@ const createDefaultLight = (
         shadowNear: 0.1,
         shadowFar: 50,
         shadowRadius: 4,
-        id: `light_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: `Spot Light ${Date.now()}`,
+        id: `light_${Math.random().toString(36).substr(2, 9)}`,
+        name: "Spot Light",
       };
     case "ambient":
       return {
         ...baseLight,
         intensity: 0.6,
-        id: `light_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: `Ambient Light ${Date.now()}`,
+        id: `light_${Math.random().toString(36).substr(2, 9)}`,
+        name: "Ambient Light",
       };
     case "hemisphere":
       return {
         ...baseLight,
         groundColor: "#444444",
         intensity: 0.6,
-        id: `light_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: `Hemisphere Light ${Date.now()}`,
+        id: `light_${Math.random().toString(36).substr(2, 9)}`,
+        name: "Hemisphere Light",
       };
     default:
       throw new Error(`Unknown light type: ${type}`);
@@ -305,6 +319,9 @@ export const useSceneStore = create<SceneState & SceneActions>()(
     axesVisible: true,
     statsVisible: true,
 
+    // Performance settings defaults
+    performanceRegressionOnMove: UI_DEFAULTS.PERFORMANCE_REGRESSION_ON_MOVE,
+
     currentFilePath: null,
     sceneMetadata: SCENE_METADATA_DEFAULTS,
 
@@ -313,8 +330,21 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       let newObject: SceneObject;
 
       if (typeof typeOrObject === "string") {
-        // Create a new object from type
         newObject = createDefaultObject(typeOrObject, position);
+
+        // Create and assign a default material for the new object
+        const materialStore = useMaterialStore.getState();
+        const materialName = `${newObject.name} Material`;
+        const materialId = materialStore.createMaterial(
+          materialName,
+          "standard",
+          {
+            color: newObject.color,
+          }
+        );
+
+        // Assign the material to the object
+        newObject.materialId = materialId;
       } else {
         // Use the provided object (for imported models)
         newObject = typeOrObject;
@@ -329,12 +359,22 @@ export const useSceneStore = create<SceneState & SceneActions>()(
     },
 
     removeObject: (id) => {
+      const objectToRemove = get().objects.find((obj) => obj.id === id);
+
       set((state) => ({
         objects: state.objects.filter((obj) => obj.id !== id),
         selectedObjectIds: state.selectedObjectIds.filter(
           (selectedId) => selectedId !== id
         ),
       }));
+
+      // Clean up material assignments
+      if (objectToRemove?.materialId) {
+        const materialStore = useMaterialStore.getState();
+        materialStore.removeMaterialFromObject(id);
+        // Optionally cleanup unused materials
+        materialStore.cleanupUnusedMaterials();
+      }
 
       get().markSceneModified();
     },
@@ -366,6 +406,15 @@ export const useSceneStore = create<SceneState & SceneActions>()(
         ] as [number, number, number],
       };
 
+      // Duplicate the material if one is assigned
+      if (originalObject.materialId) {
+        const materialStore = useMaterialStore.getState();
+        const newMaterialId = materialStore.duplicateMaterial(
+          originalObject.materialId
+        );
+        duplicatedObject.materialId = newMaterialId;
+      }
+
       set((state) => ({
         objects: [...state.objects, duplicatedObject],
         selectedObjectIds: [duplicatedObject.id],
@@ -379,10 +428,8 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       let newLight: SceneLight;
 
       if (typeof typeOrLight === "string") {
-        // Create a new light from type
         newLight = createDefaultLight(typeOrLight, position);
       } else {
-        // Use the provided light object
         newLight = {
           ...typeOrLight,
           id: `light_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -598,6 +645,11 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       get().markSceneModified();
     },
 
+    // Performance settings actions
+    setPerformanceRegressionOnMove: (enabled) => {
+      set({ performanceRegressionOnMove: enabled });
+    },
+
     clearScene: () => {
       set({
         objects: [],
@@ -696,6 +748,9 @@ export const useSceneStore = create<SceneState & SceneActions>()(
     },
 
     loadScene: (sceneState) => {
+      // Cleanup resources from current scene before loading new one
+      get().cleanupSceneResources();
+
       set((state) => ({
         ...state,
         ...sceneState,
@@ -711,6 +766,49 @@ export const useSceneStore = create<SceneState & SceneActions>()(
           isModified: false,
         },
       }));
+    },
+
+    // Memory management functions
+    cleanupSceneResources: () => {
+      const state = get();
+
+      // Dispose of imported model geometries and materials
+      for (const object of state.objects) {
+        if (object.type === "imported" && object.importedModel) {
+          object.importedModel.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              if (child.geometry) {
+                child.geometry.dispose();
+              }
+              if (child.material) {
+                if (Array.isArray(child.material)) {
+                  for (const material of child.material) {
+                    material.dispose();
+                  }
+                } else {
+                  child.material.dispose();
+                }
+              }
+            }
+          });
+        }
+      }
+
+      // Clear model cache
+      clearModelCache();
+
+      // Clear geometry and material pools
+      clearPools();
+    },
+
+    forceGarbageCollection: () => {
+      // Cleanup scene resources
+      get().cleanupSceneResources();
+
+      // Force garbage collection if available (only in development/debugging)
+      if (typeof window !== "undefined" && "gc" in window) {
+        (window as Window & { gc?: () => void }).gc?.();
+      }
     },
   }))
 );

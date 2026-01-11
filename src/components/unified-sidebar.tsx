@@ -1,10 +1,17 @@
 import { LightPropertyPanel } from "~/components/light-property-panel";
+import { MaterialPropertyPanel } from "~/components/material-property-panel";
 import { PropertyPanel } from "~/components/property-panel";
-import { useSelectedLight } from "~/stores/scene-store";
+import { useSelectedMaterial } from "~/stores/material-store";
+import { useSelectedLight, useSelectedObject } from "~/stores/scene-store";
 import { LightingPanel } from "./lighting-panel";
 import { SceneHierarchy } from "./scene-hierarchy";
 
-export type SidebarContext = "scene" | "tools" | "lighting" | "settings";
+export type SidebarContext =
+  | "scene"
+  | "tools"
+  | "lighting"
+  | "materials"
+  | "settings";
 
 interface UnifiedSidebarProps {
   context: SidebarContext;
@@ -17,20 +24,39 @@ function SceneSidebarContent() {
 
 function ToolsSidebarContent() {
   const selectedLight = useSelectedLight();
+  const selectedMaterial = useSelectedMaterial();
+  const selectedObject = useSelectedObject();
 
-  // If a light is selected, show the light property panel
-  // Otherwise show the object property panel
-  const showLightPanel = selectedLight !== null;
+  // Priority: Material > Light > Object
+  let content: React.ReactNode;
+  if (selectedMaterial) {
+    content = <MaterialPropertyPanel />;
+  } else if (selectedLight) {
+    content = <LightPropertyPanel />;
+  } else if (selectedObject) {
+    content = <PropertyPanel />;
+  } else {
+    content = (
+      <div className="p-4">
+        <h3 className="mb-4 font-semibold text-muted-foreground text-sm">
+          Object Properties
+        </h3>
+        <p className="text-muted-foreground text-xs">
+          Select an object, light, or material to edit its properties
+        </p>
+      </div>
+    );
+  }
 
-  return (
-    <div className="h-full">
-      {showLightPanel ? <LightPropertyPanel /> : <PropertyPanel />}
-    </div>
-  );
+  return <div className="h-full">{content}</div>;
 }
 
 function LightingSidebarContent() {
   return <LightingPanel />;
+}
+
+function MaterialsSidebarContent() {
+  return <MaterialPropertyPanel />;
 }
 
 function SettingsSidebarContent() {
@@ -53,6 +79,8 @@ export function UnifiedSidebar({ context, className }: UnifiedSidebarProps) {
         return <ToolsSidebarContent />;
       case "lighting":
         return <LightingSidebarContent />;
+      case "materials":
+        return <MaterialsSidebarContent />;
       case "settings":
         return <SettingsSidebarContent />;
       default:

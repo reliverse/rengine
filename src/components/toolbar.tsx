@@ -15,12 +15,14 @@ import {
   RotateCw,
   Save,
   Scaling,
+  Settings as SettingsIcon,
   Square,
   Sun,
   Upload,
 } from "lucide-react";
 import { useState } from "react";
 import { ExportDialog } from "~/components/export-dialog";
+import { SettingsDialog } from "~/components/settings-panel";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -74,6 +76,7 @@ export function Toolbar({
   );
   const [isImporting, setIsImporting] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -199,13 +202,7 @@ export function Toolbar({
             stage: "Starting import...",
           });
 
-          const result = await modelImporter.importFromFile(
-            file,
-            undefined, // Use default position
-            (progress) => {
-              setImportProgress(progress);
-            }
-          );
+          const result = await modelImporter.importFromFile(file);
 
           setImportProgress(null);
 
@@ -277,7 +274,6 @@ export function Toolbar({
 
   const handleNewFile = async () => {
     try {
-      // Create a new basic scene immediately
       const sceneState = useSceneStore.getState();
       sceneState.clearScene();
       sceneState.addObject("cube", [0, 0, 0]);
@@ -395,7 +391,7 @@ export function Toolbar({
 
   return (
     <div className="flex items-center gap-2 border-b bg-background p-2">
-      <div className="flex items-center gap-2 px-3">
+      <div className="flex items-center gap-2 pr-3 pl-22">
         <Button
           className="h-auto p-0 font-bold text-lg transition-all duration-300 hover:scale-105 hover:bg-transparent hover:text-primary hover:shadow-lg"
           onClick={() => navigate({ to: "/welcome" })}
@@ -414,6 +410,17 @@ export function Toolbar({
           variant="ghost"
         >
           Lighting
+        </Button>
+        <Button
+          className={cn(
+            "h-auto p-0 font-medium text-sm hover:bg-transparent hover:text-primary",
+            rightSidebarContext === "materials" && "text-primary"
+          )}
+          onClick={() => setRightSidebarContext("materials")}
+          title="Materials Panel"
+          variant="ghost"
+        >
+          Materials
         </Button>
         <Button
           className={cn(
@@ -649,6 +656,19 @@ export function Toolbar({
       <div className="flex items-center gap-1">
         <Button
           className="h-8 px-3"
+          onClick={() => setSettingsDialogOpen(true)}
+          size="sm"
+          title="Settings"
+          variant="ghost"
+        >
+          <SettingsIcon className="mr-2 h-4 w-4" />
+          Settings
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <Button
+          className="h-8 px-3"
           onClick={selectAll}
           size="sm"
           variant="ghost"
@@ -668,6 +688,11 @@ export function Toolbar({
       <ExportDialog
         onOpenChange={setExportDialogOpen}
         open={exportDialogOpen}
+      />
+
+      <SettingsDialog
+        onOpenChange={setSettingsDialogOpen}
+        open={settingsDialogOpen}
       />
     </div>
   );

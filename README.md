@@ -10,19 +10,40 @@
 
 A modern 3D scene editor and prototyping tool built with React, Three.js, and Tauri. Create interactive 3D scenes with professional lighting systems, import 3D models (GLTF, OBJ, FBX), and export complete scenes. Perfect for game prototyping, architectural visualization, product design, and creative 3D projects.
 
-## Features
+> **Note**: Rengine is currently focused on providing a powerful 3D scene editing experience. While the documentation references future game engine features, the current implementation is a dedicated 3D scene editor with plans for expansion into a full game engine.
 
+## Current Features
+
+### Core 3D Editing
 - **3D Canvas**: Interactive 3D viewport with React Three Fiber and real-time rendering
 - **Object Management**: Add, select, move, rotate, and scale 3D objects with transform gizmos
 - **Property Panel**: Edit object properties (position, rotation, scale, color, visibility)
 - **Scene Hierarchy**: Visual scene tree with object organization and selection
-- **Lighting System**: Professional lighting controls with multiple light types and presets
+
+### Lighting & Environment
+- **Lighting System**: Professional lighting controls with multiple light types:
+  - Ambient, Directional, Point, Spot, and Hemisphere lights
+  - Real-time shadow casting with customizable parameters
+  - Color temperature and intensity controls
+- **Lighting Presets**: Pre-configured lighting setups (Default, Studio, Outdoor, Sunset, etc.)
+- **Environment Settings**: Background color and fog effects
+
+### 3D Model Support
 - **Model Import**: Support for GLTF, OBJ, and FBX 3D model formats
+- **Automatic Processing**: Scaling, positioning, and optimization during import
+- **Performance Warnings**: Alerts for complex models that may impact performance
+
+### Scene Management
 - **Grid System**: Visual grid for precise positioning with snap-to-grid functionality
 - **File Operations**: Save and load scene files in JSON format with auto-save
-- **Camera Controls**: Orbit controls for navigation (pan, zoom, rotate) with camera bookmarks
+- **Camera Controls**: Orbit controls for navigation (pan, zoom, rotate)
+- **Scene Templates**: Pre-configured starting scenes for different use cases
+
+### User Interface
 - **Modern UI**: Shadcn/ui components with dark theme and responsive design
 - **Toolbar**: Intuitive tool selection and object creation with keyboard shortcuts
+- **Unified Sidebar**: Context-aware panels for scene management and properties
+- **Transform Tools**: Select, Move (G), Rotate (R), Scale (S) with visual gizmos
 
 ## 🎯 Object Types
 
@@ -278,45 +299,203 @@ bun typecheck
 | `bun typecheck` | TypeScript type checking                 |
 | `bun uc`        | Run Ultracite quality checks             |
 
-## Stack Architecture
+## Architecture Overview
 
-### Frontend Architecture (React + TypeScript)
+### Current Implementation Status
 
+Rengine is currently implemented as a **3D scene editor** with a foundation for future expansion into a full game engine. The codebase is architected with modularity and extensibility in mind.
+
+#### Core Systems (Implemented)
+- **Scene Management**: Zustand-based state management for 3D scenes
+- **Rendering Engine**: React Three Fiber + Three.js for 3D graphics
+- **File System**: Tauri-based native file operations
+- **UI Framework**: Modern React components with professional design
+- **3D Model Pipeline**: Import/export system for GLTF, OBJ, FBX formats
+
+#### Future Systems (Planned)
+- **Entity Component System**: For game logic and behaviors
+- **Physics Engine**: Collision detection and simulation
+- **Scripting System**: Runtime JavaScript/TypeScript execution
+- **Asset Pipeline**: Advanced import processing and caching
+- **Plugin System**: Third-party extension support
+
+### Technical Architecture
+
+#### Frontend Architecture (React + TypeScript)
+
+- **Framework**: React 19 with modern concurrent features
 - **Routing**: TanStack Router with file-based routing
-- **3D Rendering**: React Three Fiber with Three.js
-- **State Management**: Zustand for scene and UI state
+- **3D Rendering**: React Three Fiber with Three.js WebGL backend
+- **State Management**: Zustand stores with selector optimization
 - **UI Components**: Shadcn/ui built on Radix UI primitives
-- **Styling**: Tailwind CSS with custom design system
+- **Styling**: Tailwind CSS 4 with custom design tokens
+- **Build Tool**: Vite with TypeScript and hot reload
 
-### Backend Architecture (Rust + Tauri)
+#### Backend Architecture (Rust + Tauri)
 
 - **Framework**: Tauri 2 for cross-platform desktop applications
-- **File Operations**: Native filesystem access for scene save/load
-- **Security**: Sandboxed execution with permission-based access
+- **Language**: Rust for native performance and memory safety
+- **File Operations**: Native filesystem access with permission controls
+- **Security**: Sandboxed execution with capability-based security
+- **Cross-platform**: Windows, macOS, and Linux support
 
-### Key Design Patterns
+#### 3D Graphics Pipeline
 
-- Component-based architecture
-- State-driven UI updates
-- Event-driven 3D interactions
-- File-based scene serialization
+- **Rendering Engine**: Three.js with WebGL 2.0
+- **Scene Graph**: Hierarchical object management
+- **Lighting**: Physically-based lighting with multiple light types
+- **Materials**: Standard and custom shader materials
+- **Post-processing**: Future support for advanced visual effects
 
-## Future Enhancements
+### Design Patterns
 
-- [ ] Undo/Redo functionality with command history
+#### State Management Pattern
+```typescript
+// Centralized scene state with actions
+export const useSceneStore = create<SceneState & SceneActions>()(
+  subscribeWithSelector((set, get) => ({
+    // State and actions co-located
+    objects: [],
+    lights: [],
+
+    addObject: (object) => {
+      set((state) => ({ objects: [...state.objects, object] }));
+      get().markSceneModified();
+    }
+  }))
+);
+```
+
+#### Component Composition Pattern
+```typescript
+// Declarative 3D rendering
+function SceneCanvas() {
+  return (
+    <Canvas>
+      <SceneObjects />
+      <SceneLights />
+      <TransformControls />
+    </Canvas>
+  );
+}
+```
+
+#### File-based Routing Pattern
+```
+src/routes/
+├── index.tsx      # Welcome/Home page
+├── auth.tsx       # Authentication
+├── account.tsx    # User account
+├── settings.tsx   # Application settings
+└── __root.tsx     # Layout and global context
+```
+
+#### Native Integration Pattern
+```rust
+// Safe Rust backend with Tauri commands
+#[tauri::command]
+async fn read_directory(path: String) -> Result<DirectoryContents, String> {
+    // Cross-platform file operations
+}
+```
+
+### Data Flow Architecture
+
+```
+User Input → React Event Handlers → Zustand Actions → Three.js Scene Updates → Visual Feedback
+    ↓
+File Save → Tauri Command → Native File System → JSON Serialization
+    ↓
+File Load ← JSON Deserialization ← Native File System ← Tauri Command
+```
+
+### Performance Optimizations
+
+#### Rendering Optimizations
+- **React Three Fiber**: Efficient virtual DOM for 3D scenes
+- **Object Instancing**: Shared geometry for similar objects
+- **Frustum Culling**: Automatic visibility culling
+- **LOD System**: Level-of-detail for complex models
+
+#### Memory Management
+- **Asset Deduplication**: Prevent duplicate loading
+- **Lazy Loading**: Components loaded on demand
+- **Garbage Collection**: Proper cleanup of 3D resources
+
+#### UI Performance
+- **Virtual Scrolling**: For large scene hierarchies
+- **Debounced Updates**: Prevent excessive re-renders
+- **Memoization**: React.memo and useMemo for expensive operations
+
+## Development Roadmap
+
+### Recently Completed ✅
+- [x] Core 3D scene editing with transform tools
+- [x] Professional lighting system with multiple light types
+- [x] 3D model import (GLTF, OBJ, FBX) with automatic processing
+- [x] Scene save/load with JSON format and auto-save
+- [x] Modern UI with dark theme and responsive design
+- [x] Grid system with snap-to-grid functionality
+- [x] Camera controls with orbit navigation
+- [x] Property panels for object and light editing
+- [x] Scene hierarchy with object organization
+- [x] Cross-platform desktop application (Windows/macOS/Linux)
+
+### Short Term (Next 1-2 Releases) 🎯
+- [ ] Undo/Redo system with command history
 - [ ] Copy/Paste objects and hierarchies
-- [ ] Texture and material system with PBR support
+- [ ] Export to GLTF format
+- [ ] Advanced material editor
+- [ ] Texture support and UV mapping
+- [ ] Scene templates and presets
+- [ ] Keyboard shortcuts customization
+
+### Medium Term (3-6 Months) 🚀
 - [ ] Animation timeline and keyframe system
-- [ ] Export to various formats (GLTF, OBJ, FBX)
-- [ ] Plugin system with JavaScript/TypeScript API
-- [ ] Collaborative editing with real-time synchronization
-- [ ] Advanced material editor with node-based workflow
-- [ ] Physics simulation with collision detection
-- [ ] Particle systems and visual effects
-- [ ] Terrain editor with heightmaps
-- [ ] Audio system integration
-- [ ] Scriptable components and behaviors
+- [ ] Plugin system foundation
+- [ ] Physics simulation integration
+- [ ] Multi-scene support and scene references
 - [ ] Asset library with search and organization
+- [ ] Performance optimizations for large scenes
+
+### Long Term (6+ Months) 🌟
+- [ ] Full game engine features (ECS, scripting)
+- [ ] Real-time collaboration and multi-user editing
+- [ ] Advanced rendering pipeline (PBR, post-processing)
+- [ ] Audio system integration
+- [ ] Terrain editor with procedural generation
+- [ ] Particle systems and visual effects
+- [ ] Network multiplayer support
+
+### Future Engine Features (Post-Scene Editor) 🔮
+These features will be implemented as Rengine evolves from a 3D scene editor into a full game engine:
+
+#### Entity Component System
+- [ ] Component-based architecture
+- [ ] Runtime-safe add/remove components
+- [ ] System scheduling and dependencies
+
+#### Scripting & Logic
+- [ ] JavaScript/TypeScript scripting
+- [ ] Visual scripting with node graphs
+- [ ] Lifecycle hooks and event system
+
+#### Advanced Rendering
+- [ ] Physically-based rendering (PBR)
+- [ ] Global illumination
+- [ ] Advanced post-processing stack
+- [ ] Multiple render targets and viewports
+
+#### Asset Pipeline
+- [ ] Asset importing and processing
+- [ ] Dependency tracking and caching
+- [ ] Asset variants and LODs
+
+#### Tooling & Workflow
+- [ ] Scene play-in-editor
+- [ ] Live editing during play mode
+- [ ] Performance profiling and debugging
+- [ ] Automated testing and CI/CD
 
 ## Roadmap
 

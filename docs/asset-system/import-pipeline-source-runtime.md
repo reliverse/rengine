@@ -34,28 +34,117 @@ Different asset types have specialized import pipelines:
 Central coordinator for asset import operations:
 
 ```typescript
-class AssetImportPipeline {
-  private processors = new Map<AssetType, AssetProcessor[]>();
-  private cache = new Map<string, PipelineCacheEntry>();
+function createAssetImportPipeline() {
+  const processors = new Map<AssetType, AssetProcessor[]>();
+  const cache = new Map<string, PipelineCacheEntry>();
 
-  constructor() {
-    this.initializeProcessors();
-  }
+  const detectAssetType = (sourcePath: string): AssetType => {
+    const extension = sourcePath.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'webp':
+        return AssetType.TEXTURE;
+      case 'obj':
+      case 'fbx':
+      case 'gltf':
+      case 'glb':
+        return AssetType.MODEL;
+      case 'wav':
+      case 'mp3':
+      case 'ogg':
+        return AssetType.AUDIO;
+      default:
+        return AssetType.UNKNOWN;
+    }
+  };
 
-  async importAsset(sourcePath: string, options: ImportOptions = {}): Promise<ImportedAsset> {
-    const assetType = this.detectAssetType(sourcePath);
-    const cacheKey = this.generateCacheKey(sourcePath, options);
+  const generateCacheKey = (sourcePath: string, options: ImportOptions): string => {
+    return `${sourcePath}:${JSON.stringify(options)}`;
+  };
+
+  const loadSourceAsset = async (sourcePath: string): Promise<any> => {
+    // Implementation for loading source asset
+    const fs = await import('fs');
+    return fs.readFile(sourcePath);
+  };
+
+  const createImportedAsset = (pipelineAsset: PipelineAsset): ImportedAsset => {
+    // Implementation for creating final imported asset
+    return {
+      id: `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      sourcePath: pipelineAsset.sourcePath,
+      type: pipelineAsset.type,
+      data: pipelineAsset.data,
+      metadata: pipelineAsset.metadata,
+      dependencies: pipelineAsset.dependencies || [],
+      warnings: pipelineAsset.warnings || [],
+      errors: pipelineAsset.errors || []
+    };
+  };
+
+  const runPipeline = async (
+    sourcePath: string,
+    assetType: AssetType,
+    options: ImportOptions
+  ): Promise<ImportedAsset> => {
+    const processorList = processors.get(assetType) || [];
+
+    let currentAsset: PipelineAsset = {
+      sourcePath,
+      type: assetType,
+      data: await loadSourceAsset(sourcePath),
+      metadata: {}
+    };
+
+    // Run each processor in sequence
+    for (const processor of processorList) {
+      currentAsset = await processor.process(currentAsset, options);
+    }
+
+    return createImportedAsset(currentAsset);
+  };
+
+  const initializeProcessors = (): void => {
+    // Texture processors
+    processors.set(AssetType.TEXTURE, [
+      createTextureValidator(),
+      createTextureCompressor(),
+      createMipmapGenerator(),
+      createTextureOptimizer()
+    ]);
+
+    // Model processors
+    processors.set(AssetType.MODEL, [
+      createModelValidator(),
+      createModelOptimizer(),
+      createLODGenerator(),
+      createMaterialProcessor()
+    ]);
+
+    // Audio processors
+    processors.set(AssetType.AUDIO, [
+      createAudioValidator(),
+      createAudioCompressor(),
+      createAudioNormalizer()
+    ]);
+  };
+
+  const importAsset = async (sourcePath: string, options: ImportOptions = {}): Promise<ImportedAsset> => {
+    const assetType = detectAssetType(sourcePath);
+    const cacheKey = generateCacheKey(sourcePath, options);
 
     // Check cache first
-    if (this.cache.has(cacheKey) && !options.forceReimport) {
-      return this.cache.get(cacheKey)!.result;
+    if (cache.has(cacheKey) && !options.forceReimport) {
+      return cache.get(cacheKey)!.result;
     }
 
     // Run import pipeline
-    const result = await this.runPipeline(sourcePath, assetType, options);
+    const result = await runPipeline(sourcePath, assetType, options);
 
     // Cache result
-    this.cache.set(cacheKey, {
+    cache.set(cacheKey, {
       sourcePath,
       options,
       result,
@@ -63,54 +152,33 @@ class AssetImportPipeline {
     });
 
     return result;
-  }
+  };
 
-  private async runPipeline(
-    sourcePath: string,
-    assetType: AssetType,
-    options: ImportOptions
-  ): Promise<ImportedAsset> {
-    const processors = this.processors.get(assetType) || [];
+  const clearCache = (): void => {
+    cache.clear();
+  };
 
-    let currentAsset: PipelineAsset = {
-      sourcePath,
-      type: assetType,
-      data: await this.loadSourceAsset(sourcePath),
-      metadata: {}
-    };
+  const addProcessor = (assetType: AssetType, processor: AssetProcessor): void => {
+    const existing = processors.get(assetType) || [];
+    existing.push(processor);
+    processors.set(assetType, existing);
+  };
 
-    // Run each processor in sequence
-    for (const processor of processors) {
-      currentAsset = await processor.process(currentAsset, options);
-    }
+  const removeProcessor = (assetType: AssetType, processorName: string): void => {
+    const existing = processors.get(assetType) || [];
+    const filtered = existing.filter(p => p.name !== processorName);
+    processors.set(assetType, filtered);
+  };
 
-    return this.createImportedAsset(currentAsset);
-  }
+  // Initialize
+  initializeProcessors();
 
-  private initializeProcessors(): void {
-    // Texture processors
-    this.processors.set(AssetType.TEXTURE, [
-      new TextureValidator(),
-      new TextureCompressor(),
-      new MipmapGenerator(),
-      new TextureOptimizer()
-    ]);
-
-    // Model processors
-    this.processors.set(AssetType.MODEL, [
-      new ModelValidator(),
-      new ModelOptimizer(),
-      new LODGenerator(),
-      new MaterialProcessor()
-    ]);
-
-    // Audio processors
-    this.processors.set(AssetType.AUDIO, [
-      new AudioValidator(),
-      new AudioCompressor(),
-      new AudioNormalizer()
-    ]);
-  }
+  return {
+    importAsset,
+    clearCache,
+    addProcessor,
+    removeProcessor
+  };
 }
 ```
 
@@ -150,10 +218,15 @@ interface ProcessorCapabilities {
 ### Texture Processing Stages
 
 ```typescript
-class TextureValidator implements AssetProcessor {
-  readonly name = 'TextureValidator';
+function createTextureValidator(): AssetProcessor {
+  const name = 'TextureValidator';
+  const supportedTypes = [AssetType.TEXTURE];
 
-  async process(asset: PipelineAsset, options: ImportOptions): Promise<PipelineAsset> {
+  const isPowerOfTwo = (n: number): boolean => {
+    return (n & (n - 1)) === 0;
+  };
+
+  const process = async (asset: PipelineAsset, options: ImportOptions): Promise<PipelineAsset> => {
     const imageData = asset.data as ImageData;
 
     // Validate image dimensions
@@ -163,7 +236,7 @@ class TextureValidator implements AssetProcessor {
     }
 
     // Check for power-of-two dimensions
-    const isPOT = this.isPowerOfTwo(imageData.width) && this.isPowerOfTwo(imageData.height);
+    const isPOT = isPowerOfTwo(imageData.width) && isPowerOfTwo(imageData.height);
     if (!isPOT && options.requirePOT) {
       asset.errors = asset.errors || [];
       asset.errors.push('Texture dimensions must be power-of-two');
@@ -175,24 +248,54 @@ class TextureValidator implements AssetProcessor {
     }
 
     return asset;
-  }
+  };
 
-  private isPowerOfTwo(n: number): boolean {
-    return (n & (n - 1)) === 0;
-  }
+  const getCapabilities = (): ProcessorCapabilities => ({
+    canProcess: (assetType: AssetType) => supportedTypes.includes(assetType),
+    getSupportedFormats: () => ['png', 'jpg', 'jpeg', 'webp', 'tiff', 'bmp'],
+    getOutputFormats: () => ['png', 'jpg', 'jpeg', 'webp'],
+    isLossy: () => false
+  });
+
+  return {
+    name,
+    supportedTypes,
+    process,
+    getCapabilities
+  };
 }
 
-class TextureCompressor implements AssetProcessor {
-  readonly name = 'TextureCompressor';
+function createTextureCompressor(): AssetProcessor {
+  const name = 'TextureCompressor';
+  const supportedTypes = [AssetType.TEXTURE];
 
-  async process(asset: PipelineAsset, options: ImportOptions): Promise<PipelineAsset> {
+  const selectCompressionFormat = (platform: Platform): TextureFormat => {
+    switch (platform) {
+      case Platform.WEBGL:
+        return TextureFormat.DXT5; // WebGL supports DXT
+      case Platform.METAL:
+        return TextureFormat.ASTC; // Metal prefers ASTC
+      case Platform.VULKAN:
+        return TextureFormat.BC7; // Vulkan supports BC7
+      default:
+        return TextureFormat.RGBA; // Fallback to uncompressed
+    }
+  };
+
+  const compressTexture = async (imageData: ImageData, format: TextureFormat): Promise<Uint8Array> => {
+    // Implementation for texture compression
+    // This would use actual compression algorithms
+    return new Uint8Array(imageData.width * imageData.height * 4);
+  };
+
+  const process = async (asset: PipelineAsset, options: ImportOptions): Promise<PipelineAsset> => {
     const imageData = asset.data as ImageData;
 
     // Choose compression format based on platform and options
-    const compressionFormat = this.selectCompressionFormat(options.targetPlatform);
+    const compressionFormat = selectCompressionFormat(options.targetPlatform);
 
     // Compress texture
-    const compressedData = await this.compressTexture(imageData, compressionFormat);
+    const compressedData = await compressTexture(imageData, compressionFormat);
 
     return {
       ...asset,
@@ -204,32 +307,65 @@ class TextureCompressor implements AssetProcessor {
         compressedSize: compressedData.length
       }
     };
-  }
+  };
 
-  private selectCompressionFormat(platform: Platform): TextureFormat {
-    switch (platform) {
-      case Platform.WEBGL:
-        return TextureFormat.DXT5; // WebGL supports DXT
-      case Platform.METAL:
-        return TextureFormat.ASTC; // Metal prefers ASTC
-      case Platform.VULKAN:
-        return TextureFormat.BC7; // Vulkan supports BC7
-      default:
-        return TextureFormat.RGBA; // Fallback to uncompressed
-    }
-  }
+  const getCapabilities = (): ProcessorCapabilities => ({
+    canProcess: (assetType: AssetType) => supportedTypes.includes(assetType),
+    getSupportedFormats: () => ['png', 'jpg', 'jpeg', 'webp'],
+    getOutputFormats: () => ['dds', 'ktx', 'pvr'],
+    isLossy: () => true
+  });
+
+  return {
+    name,
+    supportedTypes,
+    process,
+    getCapabilities
+  };
 }
 
-class MipmapGenerator implements AssetProcessor {
-  readonly name = 'MipmapGenerator';
+function createMipmapGenerator(): AssetProcessor {
+  const name = 'MipmapGenerator';
+  const supportedTypes = [AssetType.TEXTURE];
 
-  async process(asset: PipelineAsset, options: ImportOptions): Promise<PipelineAsset> {
+  const downsampleTexture = async (data: Uint8Array, width: number, height: number): Promise<Uint8Array> => {
+    // Implementation for downsampling texture for mipmap generation
+    const newWidth = Math.max(1, width / 2);
+    const newHeight = Math.max(1, height / 2);
+    // Simple box filter downsampling
+    return new Uint8Array(newWidth * newHeight * 4);
+  };
+
+  const generateMipmaps = async (textureData: CompressedTextureData): Promise<MipmapLevel[]> => {
+    const mipmaps: MipmapLevel[] = [];
+    let currentData = textureData.data;
+    let width = textureData.width;
+    let height = textureData.height;
+
+    while (width > 1 || height > 1) {
+      // Generate next mipmap level
+      const mipmapData = await downsampleTexture(currentData, width, height);
+      mipmaps.push({
+        data: mipmapData,
+        width: Math.max(1, width / 2),
+        height: Math.max(1, height / 2)
+      });
+
+      currentData = mipmapData;
+      width = Math.max(1, width / 2);
+      height = Math.max(1, height / 2);
+    }
+
+    return mipmaps;
+  };
+
+  const process = async (asset: PipelineAsset, options: ImportOptions): Promise<PipelineAsset> => {
     if (!options.generateMipmaps) return asset;
 
     const imageData = asset.data as CompressedTextureData;
 
     // Generate mipmap chain
-    const mipmaps = await this.generateMipmaps(imageData);
+    const mipmaps = await generateMipmaps(imageData);
 
     return {
       ...asset,
@@ -243,30 +379,21 @@ class MipmapGenerator implements AssetProcessor {
         hasMipmaps: true
       }
     };
-  }
+  };
 
-  private async generateMipmaps(textureData: CompressedTextureData): Promise<MipmapLevel[]> {
-    const mipmaps: MipmapLevel[] = [];
-    let currentData = textureData.data;
-    let width = textureData.width;
-    let height = textureData.height;
+  const getCapabilities = (): ProcessorCapabilities => ({
+    canProcess: (assetType: AssetType) => supportedTypes.includes(assetType),
+    getSupportedFormats: () => ['png', 'jpg', 'jpeg', 'webp'],
+    getOutputFormats: () => ['png', 'jpg', 'jpeg', 'webp'],
+    isLossy: () => false
+  });
 
-    while (width > 1 || height > 1) {
-      // Generate next mipmap level
-      const mipmapData = await this.downsampleTexture(currentData, width, height);
-      mipmaps.push({
-        data: mipmapData,
-        width: Math.max(1, width / 2),
-        height: Math.max(1, height / 2)
-      });
-
-      currentData = mipmapData;
-      width = Math.max(1, width / 2);
-      height = Math.max(1, height / 2);
-    }
-
-    return mipmaps;
-  }
+  return {
+    name,
+    supportedTypes,
+    process,
+    getCapabilities
+  };
 }
 ```
 
@@ -547,39 +674,27 @@ const platformPresets: Record<Platform, PlatformPreset> = {
 Robust error handling throughout the pipeline:
 
 ```typescript
-class PipelineErrorHandler {
-  async handleProcessorError(
-    processor: AssetProcessor,
-    asset: PipelineAsset,
-    error: Error,
-    options: ErrorHandlingOptions
-  ): Promise<PipelineAsset> {
+function createPipelineErrorHandler() {
+  const logError = async (processor: AssetProcessor, asset: PipelineAsset, error: Error): Promise<void> => {
+    // Implementation for logging errors
     console.error(`Pipeline error in ${processor.name}:`, error);
+  };
 
-    // Log error details
-    await this.logError(processor, asset, error);
-
-    // Attempt recovery based on error type
-    if (error instanceof ValidationError) {
-      return this.handleValidationError(asset, error, options);
-    } else if (error instanceof ProcessingError) {
-      return this.handleProcessingError(asset, error, options);
-    } else if (error instanceof MemoryError) {
-      return this.handleMemoryError(asset, error, options);
-    }
-
-    // Unrecoverable error
-    asset.errors = asset.errors || [];
-    asset.errors.push(`Unrecoverable error: ${error.message}`);
-
+  const attemptValidationFix = async (asset: PipelineAsset, error: ValidationError): Promise<PipelineAsset> => {
+    // Implementation for attempting to fix validation errors
     return asset;
-  }
+  };
 
-  private async handleValidationError(
+  const tryAlternativeProcessor = async (asset: PipelineAsset, error: ProcessingError): Promise<PipelineAsset> => {
+    // Implementation for trying alternative processors
+    return asset;
+  };
+
+  const handleValidationError = async (
     asset: PipelineAsset,
     error: ValidationError,
     options: ErrorHandlingOptions
-  ): Promise<PipelineAsset> {
+  ): Promise<PipelineAsset> => {
     if (options.failOnWarnings) {
       asset.errors = asset.errors || [];
       asset.errors.push(`Validation failed: ${error.message}`);
@@ -587,14 +702,14 @@ class PipelineErrorHandler {
     }
 
     // Attempt to fix validation issues
-    return this.attemptValidationFix(asset, error);
-  }
+    return attemptValidationFix(asset, error);
+  };
 
-  private async handleProcessingError(
+  const handleProcessingError = async (
     asset: PipelineAsset,
     error: ProcessingError,
     options: ErrorHandlingOptions
-  ): Promise<PipelineAsset> {
+  ): Promise<PipelineAsset> => {
     if (options.skipOnError) {
       // Skip this processor and continue
       asset.warnings = asset.warnings || [];
@@ -603,8 +718,42 @@ class PipelineErrorHandler {
     }
 
     // Try alternative processor
-    return this.tryAlternativeProcessor(asset, error);
-  }
+    return tryAlternativeProcessor(asset, error);
+  };
+
+  const handleProcessorError = async (
+    processor: AssetProcessor,
+    asset: PipelineAsset,
+    error: Error,
+    options: ErrorHandlingOptions
+  ): Promise<PipelineAsset> => {
+    console.error(`Pipeline error in ${processor.name}:`, error);
+
+    // Log error details
+    await logError(processor, asset, error);
+
+    // Attempt recovery based on error type
+    if (error instanceof ValidationError) {
+      return handleValidationError(asset, error, options);
+    } else if (error instanceof ProcessingError) {
+      return handleProcessingError(asset, error, options);
+    } else if (error instanceof MemoryError) {
+      // Handle memory error - similar pattern
+      asset.errors = asset.errors || [];
+      asset.errors.push(`Memory error: ${error.message}`);
+      return asset;
+    }
+
+    // Unrecoverable error
+    asset.errors = asset.errors || [];
+    asset.errors.push(`Unrecoverable error: ${error.message}`);
+
+    return asset;
+  };
+
+  return {
+    handleProcessorError
+  };
 }
 ```
 

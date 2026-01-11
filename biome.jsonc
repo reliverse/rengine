@@ -35,10 +35,15 @@
         "noNamespaceImport": "off"
       },
       "style": {
-        "useBlockStatements": "off"
+        "useBlockStatements": "off",
+        "noNestedTernary": "off",
+        "useDefaultSwitchClause": "off"
       },
       "complexity": {
         "noExcessiveCognitiveComplexity": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off"
       }
     }
   },

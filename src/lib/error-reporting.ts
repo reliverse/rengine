@@ -30,41 +30,39 @@ export type ErrorCategory =
 
 export type ErrorSeverity = "low" | "medium" | "high" | "critical";
 
-class ErrorReportingService {
-  private reports: ErrorReport[] = [];
-  private readonly maxStoredReports = 50;
-  private readonly sessionId: string;
+function createErrorReportingService() {
+  // Private state using closures
+  let reports: ErrorReport[] = [];
+  const maxStoredReports = 50;
+  const sessionId: string = generateSessionId();
 
-  constructor() {
-    this.sessionId = this.generateSessionId();
-    this.loadStoredReports();
-  }
+  loadStoredReports();
 
-  private generateSessionId(): string {
+  function generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private loadStoredReports(): void {
+  function loadStoredReports(): void {
     try {
       const stored = localStorage.getItem("error_reports");
       if (stored) {
-        this.reports = JSON.parse(stored);
+        reports = JSON.parse(stored);
       }
     } catch (error) {
       console.warn("Failed to load stored error reports:", error);
-      this.reports = [];
+      reports = [];
     }
   }
 
-  private saveReports(): void {
+  function saveReports(): void {
     try {
-      localStorage.setItem("error_reports", JSON.stringify(this.reports));
+      localStorage.setItem("error_reports", JSON.stringify(reports));
     } catch (error) {
       console.warn("Failed to save error reports:", error);
     }
   }
 
-  private categorizeError(
+  function categorizeError(
     error: Error,
     context?: Record<string, unknown>
   ): ErrorCategory {
@@ -120,7 +118,7 @@ class ErrorReportingService {
     return "unknown";
   }
 
-  private determineSeverity(
+  function determineSeverity(
     category: ErrorCategory,
     error: Error,
     context?: Record<string, unknown>
@@ -153,15 +151,15 @@ class ErrorReportingService {
     return "low";
   }
 
-  reportError(
+  function reportError(
     error: Error,
     context?: Record<string, unknown>,
     userId?: string,
     showToast = true
   ): string {
     const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const category = this.categorizeError(error, context);
-    const severity = this.determineSeverity(category, error, context);
+    const category = categorizeError(error, context);
+    const severity = determineSeverity(category, error, context);
 
     const report: ErrorReport = {
       id: errorId,
@@ -172,31 +170,31 @@ class ErrorReportingService {
       category,
       severity,
       userId,
-      sessionId: this.sessionId,
+      sessionId,
       userAgent: navigator.userAgent,
       url: window.location.href,
       platform: navigator.platform,
     };
 
     // Add to reports array
-    this.reports.push(report);
+    reports.push(report);
 
     // Keep only the most recent reports
-    if (this.reports.length > this.maxStoredReports) {
-      this.reports.shift();
+    if (reports.length > maxStoredReports) {
+      reports.shift();
     }
 
     // Save to localStorage
-    this.saveReports();
+    saveReports();
 
     // Send to external service in production
     if (!import.meta.env.DEV) {
-      this.sendToExternalService(report);
+      sendToExternalService(report);
     }
 
     // Show user-friendly toast notification
     if (showToast) {
-      this.showErrorToast(report);
+      showErrorToast(report);
     }
 
     // Log to console in development
@@ -207,7 +205,7 @@ class ErrorReportingService {
     return errorId;
   }
 
-  private showErrorToast(report: ErrorReport): void {
+  function showErrorToast(report: ErrorReport): void {
     const getToastMessage = () => {
       switch (report.category) {
         case "network":
@@ -247,12 +245,12 @@ class ErrorReportingService {
       duration: 6000,
       action: {
         label: "Report Issue",
-        onClick: () => this.openSupportForm(report),
+        onClick: () => openSupportForm(report),
       },
     });
   }
 
-  private openSupportForm(report: ErrorReport): void {
+  function openSupportForm(report: ErrorReport): void {
     const subject = encodeURIComponent(`Error Report: ${report.category}`);
     const body = encodeURIComponent(
       `
@@ -275,7 +273,7 @@ ${report.context ? `Context:\n${JSON.stringify(report.context, null, 2)}` : ""}
     open(`mailto:support@rengine.com?subject=${subject}&body=${body}`);
   }
 
-  private sendToExternalService(report: ErrorReport): void {
+  function sendToExternalService(report: ErrorReport): void {
     // In a real application, this would send to services like:
     // - Sentry
     // - LogRocket
@@ -297,13 +295,13 @@ ${report.context ? `Context:\n${JSON.stringify(report.context, null, 2)}` : ""}
   }
 
   // Analytics methods
-  getReports(options?: {
+  function getReports(options?: {
     category?: ErrorCategory;
     severity?: ErrorSeverity;
     since?: Date;
     limit?: number;
   }): ErrorReport[] {
-    let filtered = [...this.reports];
+    let filtered = [...reports];
 
     if (options?.category) {
       filtered = filtered.filter((r) => r.category === options.category);
@@ -325,7 +323,7 @@ ${report.context ? `Context:\n${JSON.stringify(report.context, null, 2)}` : ""}
     return filtered;
   }
 
-  getErrorStats(): {
+  function getErrorStats(): {
     total: number;
     byCategory: Record<ErrorCategory, number>;
     bySeverity: Record<ErrorSeverity, number>;
@@ -334,7 +332,7 @@ ${report.context ? `Context:\n${JSON.stringify(report.context, null, 2)}` : ""}
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    const recentErrors = this.reports.filter(
+    const recentErrors = reports.filter(
       (r) => new Date(r.timestamp) >= oneDayAgo
     ).length;
 
@@ -354,31 +352,39 @@ ${report.context ? `Context:\n${JSON.stringify(report.context, null, 2)}` : ""}
       critical: 0,
     };
 
-    for (const report of this.reports) {
+    for (const report of reports) {
       byCategory[report.category]++;
       bySeverity[report.severity]++;
     }
 
     return {
-      total: this.reports.length,
+      total: reports.length,
       byCategory,
       bySeverity,
       recentErrors,
     };
   }
 
-  clearReports(): void {
-    this.reports = [];
-    this.saveReports();
+  function clearReports(): void {
+    reports = [];
+    saveReports();
   }
 
-  exportReports(): string {
-    return JSON.stringify(this.reports, null, 2);
+  function exportReports(): string {
+    return JSON.stringify(reports, null, 2);
   }
+
+  // Return public interface
+  return {
+    reportError,
+    getReports,
+    getErrorStats,
+    clearReports,
+    exportReports,
+  };
 }
 
-// Create singleton instance
-export const errorReporting = new ErrorReportingService();
+export const errorReporting = createErrorReportingService();
 
 // Convenience functions for common error reporting patterns
 export const reportApiError = (

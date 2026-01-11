@@ -31,90 +31,112 @@ Different caching strategies for different scenarios:
 Central coordinator for all caching operations:
 
 ```typescript
-class AssetCacheManager {
-  private l1Cache: MemoryCache;
-  private l2Cache: CompressedCache;
-  private diskCache: DiskCache;
-  private networkCache: NetworkCache;
+interface CacheManager {
+  getAsset: (assetId: string) => Promise<AssetData | null>;
+  putAsset: (assetId: string, assetData: AssetData, priority?: CachePriority) => Promise<void>;
+  evictAsset: (assetId: string) => Promise<void>;
+  clearCache: () => Promise<void>;
+}
 
-  constructor(options: CacheOptions) {
-    this.l1Cache = new MemoryCache(options.l1Size);
-    this.l2Cache = new CompressedCache(options.l2Size);
-    this.diskCache = new DiskCache(options.diskPath, options.diskSize);
-    this.networkCache = new NetworkCache(options.networkPath);
-  }
+function createAssetCacheManager(options: CacheOptions): CacheManager {
+  const l1Cache = createMemoryCache(options.l1Size);
+  const l2Cache = createCompressedCache(options.l2Size);
+  const diskCache = createDiskCache(options.diskPath, options.diskSize);
+  const networkCache = createNetworkCache(options.networkPath);
 
-  async getAsset(assetId: string): Promise<AssetData | null> {
+  const recordCacheHit = (cacheType: string, assetId: string) => {
+    // Implementation for recording cache hits
+    console.log(`Cache hit in ${cacheType}: ${assetId}`);
+  };
+
+  const recordCacheMiss = (assetId: string) => {
+    // Implementation for recording cache misses
+    console.log(`Cache miss: ${assetId}`);
+  };
+
+  const recordCacheStore = (assetId: string, size: number) => {
+    // Implementation for recording cache stores
+    console.log(`Stored asset ${assetId} (${size} bytes)`);
+  };
+
+  const getAsset = async (assetId: string): Promise<AssetData | null> => {
     // Try L1 cache first
-    let asset = await this.l1Cache.get(assetId);
+    let asset = await l1Cache.get(assetId);
     if (asset) {
-      this.recordCacheHit('l1', assetId);
+      recordCacheHit('l1', assetId);
       return asset;
     }
 
     // Try L2 cache
-    asset = await this.l2Cache.get(assetId);
+    asset = await l2Cache.get(assetId);
     if (asset) {
-      this.recordCacheHit('l2', assetId);
+      recordCacheHit('l2', assetId);
       // Promote to L1
-      await this.l1Cache.put(assetId, asset);
+      await l1Cache.put(assetId, asset);
       return asset;
     }
 
     // Try disk cache
-    asset = await this.diskCache.get(assetId);
+    asset = await diskCache.get(assetId);
     if (asset) {
-      this.recordCacheHit('disk', assetId);
+      recordCacheHit('disk', assetId);
       // Promote to higher caches
-      await this.l2Cache.put(assetId, asset);
-      await this.l1Cache.put(assetId, asset);
+      await l2Cache.put(assetId, asset);
+      await l1Cache.put(assetId, asset);
       return asset;
     }
 
     // Try network cache for remote assets
-    asset = await this.networkCache.get(assetId);
+    asset = await networkCache.get(assetId);
     if (asset) {
-      this.recordCacheHit('network', assetId);
+      recordCacheHit('network', assetId);
       // Store in other caches
-      await this.diskCache.put(assetId, asset);
-      await this.l2Cache.put(assetId, asset);
-      await this.l1Cache.put(assetId, asset);
+      await diskCache.put(assetId, asset);
+      await l2Cache.put(assetId, asset);
+      await l1Cache.put(assetId, asset);
       return asset;
     }
 
-    this.recordCacheMiss(assetId);
+    recordCacheMiss(assetId);
     return null;
-  }
+  };
 
-  async putAsset(assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> {
+  const putAsset = async (assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> => {
     // Store in all applicable caches
     const promises = [
-      this.l1Cache.put(assetId, assetData, priority),
-      this.l2Cache.put(assetId, assetData, priority),
-      this.diskCache.put(assetId, assetData, priority)
+      l1Cache.put(assetId, assetData, priority),
+      l2Cache.put(assetId, assetData, priority),
+      diskCache.put(assetId, assetData, priority)
     ];
 
     await Promise.all(promises);
-    this.recordCacheStore(assetId, assetData.size);
-  }
+    recordCacheStore(assetId, assetData.size || 0);
+  };
 
-  async evictAsset(assetId: string): Promise<void> {
+  const evictAsset = async (assetId: string): Promise<void> => {
     await Promise.all([
-      this.l1Cache.evict(assetId),
-      this.l2Cache.evict(assetId),
-      this.diskCache.evict(assetId),
-      this.networkCache.evict(assetId)
+      l1Cache.evict(assetId),
+      l2Cache.evict(assetId),
+      diskCache.evict(assetId),
+      networkCache.evict(assetId)
     ]);
-  }
+  };
 
-  async clearCache(): Promise<void> {
+  const clearCache = async (): Promise<void> => {
     await Promise.all([
-      this.l1Cache.clear(),
-      this.l2Cache.clear(),
-      this.diskCache.clear(),
-      this.networkCache.clear()
+      l1Cache.clear(),
+      l2Cache.clear(),
+      diskCache.clear(),
+      networkCache.clear()
     ]);
-  }
+  };
+
+  return {
+    getAsset,
+    putAsset,
+    evictAsset,
+    clearCache
+  };
 }
 ```
 
@@ -156,33 +178,47 @@ enum CachePriority {
 Fast in-memory cache with LRU eviction:
 
 ```typescript
-class MemoryCache implements Cache {
-  private cache = new Map<string, CacheEntry>();
-  private accessOrder = new DoublyLinkedList<string>();
-  private size = 0;
-  private maxSize: number;
+function createMemoryCache(maxSize: number): Cache {
+  const cache = new Map<string, CacheEntry>();
+  const accessOrder = createDoublyLinkedList<string>();
+  let size = 0;
 
-  constructor(maxSize: number) {
-    this.maxSize = maxSize;
-  }
+  const calculateEntrySize = (assetData: AssetData): number => {
+    // Estimate memory usage
+    if (assetData instanceof ArrayBuffer) {
+      return assetData.byteLength;
+    }
+    if (typeof assetData === 'string') {
+      return assetData.length * 2; // UTF-16
+    }
+    // For complex objects, use a rough estimation
+    return JSON.stringify(assetData).length * 2;
+  };
 
-  async get(assetId: string): Promise<AssetData | null> {
-    const entry = this.cache.get(assetId);
+  const evictLRU = async (): Promise<void> => {
+    const lruId = accessOrder.getTail();
+    if (lruId) {
+      await evict(lruId);
+    }
+  };
+
+  const get = async (assetId: string): Promise<AssetData | null> => {
+    const entry = cache.get(assetId);
     if (!entry) return null;
 
     // Move to front (most recently used)
-    this.accessOrder.moveToFront(assetId);
+    accessOrder.moveToFront(assetId);
     entry.lastAccessed = Date.now();
 
     return entry.data;
-  }
+  };
 
-  async put(assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> {
-    const entrySize = this.calculateEntrySize(assetData);
+  const put = async (assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> => {
+    const entrySize = calculateEntrySize(assetData);
 
     // Check if we need to evict
-    while (this.size + entrySize > this.maxSize) {
-      await this.evictLRU();
+    while (size + entrySize > maxSize) {
+      await evictLRU();
     }
 
     const entry: CacheEntry = {
@@ -195,44 +231,49 @@ class MemoryCache implements Cache {
     };
 
     // Remove existing entry if present
-    if (this.cache.has(assetId)) {
-      const oldEntry = this.cache.get(assetId)!;
-      this.size -= oldEntry.size;
-      this.accessOrder.remove(assetId);
+    if (cache.has(assetId)) {
+      const oldEntry = cache.get(assetId)!;
+      size -= oldEntry.size;
+      accessOrder.remove(assetId);
     }
 
-    this.cache.set(assetId, entry);
-    this.accessOrder.addToFront(assetId);
-    this.size += entrySize;
-  }
+    cache.set(assetId, entry);
+    accessOrder.addToFront(assetId);
+    size += entrySize;
+  };
 
-  async evict(assetId: string): Promise<void> {
-    const entry = this.cache.get(assetId);
+  const evict = async (assetId: string): Promise<void> => {
+    const entry = cache.get(assetId);
     if (!entry) return;
 
-    this.cache.delete(assetId);
-    this.accessOrder.remove(assetId);
-    this.size -= entry.size;
-  }
+    cache.delete(assetId);
+    accessOrder.remove(assetId);
+    size -= entry.size;
+  };
 
-  private async evictLRU(): Promise<void> {
-    const lruId = this.accessOrder.getTail();
-    if (lruId) {
-      await this.evict(lruId);
-    }
-  }
+  const clear = async (): Promise<void> => {
+    cache.clear();
+    accessOrder.clear();
+    size = 0;
+  };
 
-  private calculateEntrySize(assetData: AssetData): number {
-    // Estimate memory usage
-    if (assetData instanceof ArrayBuffer) {
-      return assetData.byteLength;
-    }
-    if (typeof assetData === 'string') {
-      return assetData.length * 2; // UTF-16
-    }
-    // For complex objects, use a rough estimation
-    return JSON.stringify(assetData).length * 2;
-  }
+  const getStats = (): CacheStats => ({
+    size,
+    maxSize,
+    itemCount: cache.size,
+    hitCount: 0, // Would need additional tracking
+    missCount: 0,
+    evictionCount: 0,
+    hitRate: 0
+  });
+
+  return {
+    get,
+    put,
+    evict,
+    clear,
+    getStats
+  };
 }
 
 interface CacheEntry {
@@ -250,58 +291,35 @@ interface CacheEntry {
 ### Memory-Efficient Compressed Storage
 
 ```typescript
-class CompressedCache implements Cache {
-  private cache = new Map<string, CompressedEntry>();
-  private compressor: Compressor;
-  private size = 0;
-  private maxSize: number;
+function createCompressedCache(maxSize: number): Cache {
+  const cache = new Map<string, CompressedEntry>();
+  const compressor = createLZ4Compressor();
+  let size = 0;
 
-  constructor(maxSize: number) {
-    this.maxSize = maxSize;
-    this.compressor = new LZ4Compressor();
-  }
-
-  async get(assetId: string): Promise<AssetData | null> {
-    const entry = this.cache.get(assetId);
-    if (!entry) return null;
-
-    // Decompress data
-    const decompressed = await this.compressor.decompress(entry.compressedData);
-
-    // Deserialize if needed
-    return this.deserializeAsset(decompressed, entry.originalType);
-  }
-
-  async put(assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> {
-    // Serialize asset
-    const serialized = this.serializeAsset(assetData);
-    const originalSize = serialized.length;
-
-    // Compress data
-    const compressed = await this.compressor.compress(serialized);
-    const compressedSize = compressed.length;
-
-    const entry: CompressedEntry = {
-      compressedData: compressed,
-      originalSize,
-      compressedSize,
-      originalType: this.getAssetType(assetData),
-      priority,
-      created: Date.now()
-    };
-
-    // Check size limits
-    if (this.size + compressedSize > this.maxSize) {
-      await this.evictToFit(compressedSize);
+  const serializeAsset = (assetData: AssetData): Uint8Array => {
+    // Implementation for serializing assets
+    if (typeof assetData === 'string') {
+      return new TextEncoder().encode(assetData);
     }
+    return new TextEncoder().encode(JSON.stringify(assetData));
+  };
 
-    this.cache.set(assetId, entry);
-    this.size += compressedSize;
-  }
+  const deserializeAsset = (data: Uint8Array, type: string): AssetData => {
+    // Implementation for deserializing assets
+    const decoded = new TextDecoder().decode(data);
+    if (type === 'string') return decoded;
+    return JSON.parse(decoded);
+  };
 
-  private async evictToFit(neededSpace: number): Promise<void> {
+  const getAssetType = (assetData: AssetData): string => {
+    if (typeof assetData === 'string') return 'string';
+    if (assetData instanceof ArrayBuffer) return 'ArrayBuffer';
+    return 'object';
+  };
+
+  const evictToFit = async (neededSpace: number): Promise<void> => {
     // Sort entries by priority and access time
-    const entries = Array.from(this.cache.entries()).sort((a, b) => {
+    const entries = Array.from(cache.entries()).sort((a, b) => {
       const priorityOrder = { low: 0, normal: 1, high: 2, critical: 3 };
       const aPriority = priorityOrder[a[1].priority];
       const bPriority = priorityOrder[b[1].priority];
@@ -316,11 +334,80 @@ class CompressedCache implements Cache {
     for (const [assetId, entry] of entries) {
       if (freedSpace >= neededSpace) break;
 
-      this.cache.delete(assetId);
-      this.size -= entry.compressedSize;
+      cache.delete(assetId);
+      size -= entry.compressedSize;
       freedSpace += entry.compressedSize;
     }
-  }
+  };
+
+  const get = async (assetId: string): Promise<AssetData | null> => {
+    const entry = cache.get(assetId);
+    if (!entry) return null;
+
+    // Decompress data
+    const decompressed = await compressor.decompress(entry.compressedData);
+
+    // Deserialize if needed
+    return deserializeAsset(decompressed, entry.originalType);
+  };
+
+  const put = async (assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> => {
+    // Serialize asset
+    const serialized = serializeAsset(assetData);
+    const originalSize = serialized.length;
+
+    // Compress data
+    const compressed = await compressor.compress(serialized);
+    const compressedSize = compressed.length;
+
+    const entry: CompressedEntry = {
+      compressedData: compressed,
+      originalSize,
+      compressedSize,
+      originalType: getAssetType(assetData),
+      priority,
+      created: Date.now()
+    };
+
+    // Check size limits
+    if (size + compressedSize > maxSize) {
+      await evictToFit(compressedSize);
+    }
+
+    cache.set(assetId, entry);
+    size += compressedSize;
+  };
+
+  const evict = async (assetId: string): Promise<void> => {
+    const entry = cache.get(assetId);
+    if (!entry) return;
+
+    cache.delete(assetId);
+    size -= entry.compressedSize;
+  };
+
+  const clear = async (): Promise<void> => {
+    cache.clear();
+    size = 0;
+  };
+
+  const getStats = (): CacheStats => ({
+    size,
+    maxSize,
+    itemCount: cache.size,
+    hitCount: 0,
+    missCount: 0,
+    evictionCount: 0,
+    hitRate: 0
+  });
+
+  return {
+    get,
+    put,
+    evict,
+    clear,
+    getStats
+  };
 }
 
 interface CompressedEntry {
@@ -338,101 +425,73 @@ interface CompressedEntry {
 ### Persistent Storage Cache
 
 ```typescript
-class DiskCache implements Cache {
-  private cacheDir: string;
-  private indexFile: string;
-  private index = new Map<string, DiskEntry>();
-  private size = 0;
-  private maxSize: number;
+function createDiskCache(cacheDir: string, maxSize: number): Cache {
+  const indexFile = path.join(cacheDir, 'index.json');
+  const index = new Map<string, DiskEntry>();
+  let size = 0;
 
-  constructor(cacheDir: string, maxSize: number) {
-    this.cacheDir = cacheDir;
-    this.indexFile = path.join(cacheDir, 'index.json');
-    this.maxSize = maxSize;
+  const serializeAsset = (assetData: AssetData): Buffer => {
+    // Implementation for serializing assets to disk
+    if (typeof assetData === 'string') {
+      return Buffer.from(assetData, 'utf-8');
+    }
+    return Buffer.from(JSON.stringify(assetData), 'utf-8');
+  };
 
-    this.loadIndex();
-    this.ensureCacheDirectory();
-  }
+  const deserializeAsset = (data: Buffer, entry: DiskEntry): AssetData => {
+    // Implementation for deserializing assets from disk
+    const content = data.toString('utf-8');
+    if (entry.assetType === 'string') return content;
+    return JSON.parse(content);
+  };
 
-  async get(assetId: string): Promise<AssetData | null> {
-    const entry = this.index.get(assetId);
-    if (!entry) return null;
+  const getAssetType = (assetData: AssetData): string => {
+    if (typeof assetData === 'string') return 'string';
+    if (assetData instanceof ArrayBuffer) return 'ArrayBuffer';
+    return 'object';
+  };
 
-    const filePath = path.join(this.cacheDir, entry.filename);
+  const calculateHash = async (data: Buffer): Promise<string> => {
+    // Simple hash implementation
+    const crypto = await import('crypto');
+    return crypto.createHash('md5').update(data).digest('hex');
+  };
 
+  const loadIndex = async (): Promise<void> => {
     try {
-      const data = await fs.readFile(filePath);
+      const indexData = await fs.readFile(indexFile, 'utf-8');
+      const parsedIndex = JSON.parse(indexData);
 
-      // Update access time
-      entry.lastAccessed = Date.now();
-      entry.accessCount++;
+      // Clear and repopulate the index
+      index.clear();
+      Object.entries(parsedIndex).forEach(([key, value]) => {
+        index.set(key, value as DiskEntry);
+      });
 
-      await this.saveIndex();
-
-      return this.deserializeAsset(data, entry);
+      size = Array.from(index.values()).reduce((sum, entry) => sum + entry.size, 0);
     } catch (error) {
-      // File corrupted or missing, remove from index
-      this.index.delete(assetId);
-      await this.saveIndex();
-      return null;
+      // Index file doesn't exist or is corrupted
+      index.clear();
+      size = 0;
     }
-  }
+  };
 
-  async put(assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> {
-    const filename = this.generateFilename(assetId);
-    const filePath = path.join(this.cacheDir, filename);
+  const saveIndex = async (): Promise<void> => {
+    const indexObject = Object.fromEntries(index);
+    await fs.writeFile(indexFile, JSON.stringify(indexObject, null, 2));
+  };
 
-    // Serialize asset
-    const serialized = this.serializeAsset(assetData);
-
-    // Check if we need to evict
-    const newSize = serialized.length;
-    if (this.size + newSize > this.maxSize) {
-      await this.evictToFit(newSize);
-    }
-
-    // Write to disk
-    await fs.writeFile(filePath, serialized);
-
-    // Update index
-    const entry: DiskEntry = {
-      filename,
-      size: newSize,
-      priority,
-      created: Date.now(),
-      lastAccessed: Date.now(),
-      accessCount: 0,
-      assetType: this.getAssetType(assetData),
-      hash: await this.calculateHash(serialized)
-    };
-
-    this.index.set(assetId, entry);
-    this.size += newSize;
-
-    await this.saveIndex();
-  }
-
-  async evict(assetId: string): Promise<void> {
-    const entry = this.index.get(assetId);
-    if (!entry) return;
-
-    // Remove file
-    const filePath = path.join(this.cacheDir, entry.filename);
+  const ensureCacheDirectory = async (): Promise<void> => {
     try {
-      await fs.unlink(filePath);
-    } catch (error) {
-      // File might already be gone
+      await fs.access(cacheDir);
+    } catch {
+      await fs.mkdir(cacheDir, { recursive: true });
     }
+  };
 
-    // Update index
-    this.index.delete(assetId);
-    this.size -= entry.size;
-    await this.saveIndex();
-  }
-
-  private async evictToFit(neededSpace: number): Promise<void> {
+  const evictToFit = async (neededSpace: number): Promise<void> => {
     // Sort by priority, then by access time
-    const entries = Array.from(this.index.entries()).sort((a, b) => {
+    const entries = Array.from(index.entries()).sort((a, b) => {
       const priorityOrder = { low: 0, normal: 1, high: 2, critical: 3 };
       const aPriority = priorityOrder[a[1].priority];
       const bPriority = priorityOrder[b[1].priority];
@@ -447,42 +506,122 @@ class DiskCache implements Cache {
     for (const [assetId, entry] of entries) {
       if (freedSpace >= neededSpace) break;
 
-      await this.evict(assetId);
+      await evict(assetId);
       freedSpace += entry.size;
     }
-  }
+  };
 
-  private generateFilename(assetId: string): string {
+  const generateFilename = (assetId: string): string => {
     // Use asset ID with safe filename characters
     return assetId.replace(/[^a-zA-Z0-9-_]/g, '_') + '.cache';
-  }
+  };
 
-  private async loadIndex(): Promise<void> {
+  // Initialize
+  (async () => {
+    await loadIndex();
+    await ensureCacheDirectory();
+  })();
+
+  const get = async (assetId: string): Promise<AssetData | null> => {
+    const entry = index.get(assetId);
+    if (!entry) return null;
+
+    const filePath = path.join(cacheDir, entry.filename);
+
     try {
-      const indexData = await fs.readFile(this.indexFile, 'utf-8');
-      const index = JSON.parse(indexData);
+      const data = await fs.readFile(filePath);
 
-      this.index = new Map(Object.entries(index));
-      this.size = Array.from(this.index.values()).reduce((sum, entry) => sum + entry.size, 0);
+      // Update access time
+      entry.lastAccessed = Date.now();
+      entry.accessCount++;
+
+      await saveIndex();
+
+      return deserializeAsset(data, entry);
     } catch (error) {
-      // Index file doesn't exist or is corrupted
-      this.index = new Map();
-      this.size = 0;
+      // File corrupted or missing, remove from index
+      index.delete(assetId);
+      await saveIndex();
+      return null;
     }
-  }
+  };
 
-  private async saveIndex(): Promise<void> {
-    const indexObject = Object.fromEntries(this.index);
-    await fs.writeFile(this.indexFile, JSON.stringify(indexObject, null, 2));
-  }
+  const put = async (assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> => {
+    const filename = generateFilename(assetId);
+    const filePath = path.join(cacheDir, filename);
 
-  private async ensureCacheDirectory(): Promise<void> {
+    // Serialize asset
+    const serialized = serializeAsset(assetData);
+
+    // Check if we need to evict
+    const newSize = serialized.length;
+    if (size + newSize > maxSize) {
+      await evictToFit(newSize);
+    }
+
+    // Write to disk
+    await fs.writeFile(filePath, serialized);
+
+    // Update index
+    const entry: DiskEntry = {
+      filename,
+      size: newSize,
+      priority,
+      created: Date.now(),
+      lastAccessed: Date.now(),
+      accessCount: 0,
+      assetType: getAssetType(assetData),
+      hash: await calculateHash(serialized)
+    };
+
+    index.set(assetId, entry);
+    size += newSize;
+
+    await saveIndex();
+  };
+
+  const evict = async (assetId: string): Promise<void> => {
+    const entry = index.get(assetId);
+    if (!entry) return;
+
+    // Remove file
+    const filePath = path.join(cacheDir, entry.filename);
     try {
-      await fs.access(this.cacheDir);
-    } catch {
-      await fs.mkdir(this.cacheDir, { recursive: true });
+      await fs.unlink(filePath);
+    } catch (error) {
+      // File might already be gone
     }
-  }
+
+    // Update index
+    index.delete(assetId);
+    size -= entry.size;
+    await saveIndex();
+  };
+
+  const clear = async (): Promise<void> => {
+    // Remove all cache files
+    for (const [assetId] of index) {
+      await evict(assetId);
+    }
+  };
+
+  const getStats = (): CacheStats => ({
+    size,
+    maxSize,
+    itemCount: index.size,
+    hitCount: 0,
+    missCount: 0,
+    evictionCount: 0,
+    hitRate: 0
+  });
+
+  return {
+    get,
+    put,
+    evict,
+    clear,
+    getStats
+  };
 }
 
 interface DiskEntry {
@@ -502,56 +641,80 @@ interface DiskEntry {
 ### Remote Asset Caching
 
 ```typescript
-class NetworkCache implements Cache {
-  private cache = new Map<string, NetworkEntry>();
-  private httpClient: HttpClient;
+function createNetworkCache(cacheDir: string): Cache {
+  const cache = new Map<string, NetworkEntry>();
+  const httpClient = createHttpClient();
 
-  constructor(cacheDir: string) {
-    this.cacheDir = cacheDir;
-    this.httpClient = new HttpClient();
-    this.loadIndex();
-  }
+  const loadIndex = async (): Promise<void> => {
+    try {
+      const indexPath = path.join(cacheDir, 'network-index.json');
+      const indexData = await fs.readFile(indexPath, 'utf-8');
+      const parsedIndex = JSON.parse(indexData);
 
-  async get(assetId: string): Promise<AssetData | null> {
-    const entry = this.cache.get(assetId);
-    if (!entry) return null;
-
-    // Check if cached version is still valid
-    if (await this.isCacheValid(entry)) {
-      return await this.loadFromCache(entry);
+      cache.clear();
+      Object.entries(parsedIndex).forEach(([key, value]) => {
+        cache.set(key, value as NetworkEntry);
+      });
+    } catch (error) {
+      // Index doesn't exist or is corrupted
+      cache.clear();
     }
+  };
 
-    // Cache is stale, remove it
-    this.cache.delete(assetId);
-    await this.saveIndex();
+  const saveIndex = async (): Promise<void> => {
+    const indexPath = path.join(cacheDir, 'network-index.json');
+    const indexObject = Object.fromEntries(cache);
+    await fs.writeFile(indexPath, JSON.stringify(indexObject, null, 2));
+  };
 
-    return null;
-  }
+  const isRemoteAsset = (assetId: string): boolean => {
+    // Check if asset ID represents a remote URL
+    return assetId.startsWith('http://') || assetId.startsWith('https://');
+  };
 
-  async put(assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> {
-    // For network cache, we only cache remote assets
-    if (!this.isRemoteAsset(assetId)) return;
+  const getAssetUrl = (assetId: string): string => {
+    return assetId; // Asset ID is already a URL
+  };
 
-    const entry: NetworkEntry = {
-      assetId,
-      url: this.getAssetUrl(assetId),
-      etag: await this.getEtag(assetId),
-      lastModified: new Date().toISOString(),
-      size: this.calculateSize(assetData),
-      priority
-    };
+  const getEtag = async (assetId: string): Promise<string | undefined> => {
+    try {
+      const response = await httpClient.head(assetId);
+      return response.headers['etag'];
+    } catch {
+      return undefined;
+    }
+  };
 
-    // Save to disk
-    await this.saveToCache(assetId, assetData);
+  const calculateSize = (assetData: AssetData): number => {
+    if (assetData instanceof ArrayBuffer) {
+      return assetData.byteLength;
+    }
+    if (typeof assetData === 'string') {
+      return assetData.length * 2;
+    }
+    return JSON.stringify(assetData).length * 2;
+  };
 
-    this.cache.set(assetId, entry);
-    await this.saveIndex();
-  }
+  const loadFromCache = async (entry: NetworkEntry): Promise<AssetData | null> => {
+    try {
+      const cachePath = path.join(cacheDir, `${entry.assetId.replace(/[^a-zA-Z0-9]/g, '_')}.cache`);
+      const data = await fs.readFile(cachePath);
+      return JSON.parse(data.toString('utf-8'));
+    } catch {
+      return null;
+    }
+  };
 
-  private async isCacheValid(entry: NetworkEntry): Promise<boolean> {
+  const saveToCache = async (assetId: string, assetData: AssetData): Promise<void> => {
+    const cachePath = path.join(cacheDir, `${assetId.replace(/[^a-zA-Z0-9]/g, '_')}.cache`);
+    const serialized = JSON.stringify(assetData);
+    await fs.writeFile(cachePath, serialized);
+  };
+
+  const isCacheValid = async (entry: NetworkEntry): Promise<boolean> => {
     try {
       // Check with server if cache is still valid
-      const response = await this.httpClient.head(entry.url);
+      const response = await httpClient.head(entry.url);
 
       const serverEtag = response.headers['etag'];
       const serverLastModified = response.headers['last-modified'];
@@ -573,7 +736,88 @@ class NetworkCache implements Cache {
       // If we can't check with server, assume cache is valid
       return true;
     }
-  }
+  };
+
+  // Initialize
+  (async () => {
+    await loadIndex();
+  })();
+
+  const get = async (assetId: string): Promise<AssetData | null> => {
+    const entry = cache.get(assetId);
+    if (!entry) return null;
+
+    // Check if cached version is still valid
+    if (await isCacheValid(entry)) {
+      return await loadFromCache(entry);
+    }
+
+    // Cache is stale, remove it
+    cache.delete(assetId);
+    await saveIndex();
+
+    return null;
+  };
+
+  const put = async (assetId: string, assetData: AssetData, priority: CachePriority = 'normal'): Promise<void> => {
+    // For network cache, we only cache remote assets
+    if (!isRemoteAsset(assetId)) return;
+
+    const entry: NetworkEntry = {
+      assetId,
+      url: getAssetUrl(assetId),
+      etag: await getEtag(assetId),
+      lastModified: new Date().toISOString(),
+      size: calculateSize(assetData),
+      priority
+    };
+
+    // Save to disk
+    await saveToCache(assetId, assetData);
+
+    cache.set(assetId, entry);
+    await saveIndex();
+  };
+
+  const evict = async (assetId: string): Promise<void> => {
+    const entry = cache.get(assetId);
+    if (!entry) return;
+
+    // Remove cache file
+    const cachePath = path.join(cacheDir, `${assetId.replace(/[^a-zA-Z0-9]/g, '_')}.cache`);
+    try {
+      await fs.unlink(cachePath);
+    } catch {
+      // File might not exist
+    }
+
+    cache.delete(assetId);
+    await saveIndex();
+  };
+
+  const clear = async (): Promise<void> => {
+    for (const [assetId] of cache) {
+      await evict(assetId);
+    }
+  };
+
+  const getStats = (): CacheStats => ({
+    size: Array.from(cache.values()).reduce((sum, entry) => sum + entry.size, 0),
+    maxSize: Number.MAX_SAFE_INTEGER, // Network cache doesn't have a fixed size limit
+    itemCount: cache.size,
+    hitCount: 0,
+    missCount: 0,
+    evictionCount: 0,
+    hitRate: 0
+  });
+
+  return {
+    get,
+    put,
+    evict,
+    clear,
+    getStats
+  };
 }
 
 interface NetworkEntry {
@@ -591,25 +835,17 @@ interface NetworkEntry {
 ### Proactive Cache Population
 
 ```typescript
-class CacheWarmer {
-  private warmingQueue: string[] = [];
-  private isWarming = false;
+function createCacheWarmer(assetLoader: AssetLoader, assetCacheManager: CacheManager) {
+  const warmingQueue: string[] = [];
+  let isWarming = false;
 
-  async warmCache(assetIds: string[], priority: CachePriority = 'normal'): Promise<void> {
-    this.warmingQueue.push(...assetIds);
-
-    if (!this.isWarming) {
-      await this.processWarmingQueue(priority);
-    }
-  }
-
-  private async processWarmingQueue(priority: CachePriority): Promise<void> {
-    this.isWarming = true;
+  const processWarmingQueue = async (priority: CachePriority): Promise<void> => {
+    isWarming = true;
 
     try {
-      while (this.warmingQueue.length > 0) {
+      while (warmingQueue.length > 0) {
         const batchSize = 5; // Load 5 assets at a time
-        const batch = this.warmingQueue.splice(0, batchSize);
+        const batch = warmingQueue.splice(0, batchSize);
 
         const loadPromises = batch.map(async (assetId) => {
           try {
@@ -626,9 +862,21 @@ class CacheWarmer {
         await new Promise(resolve => setTimeout(resolve, 10));
       }
     } finally {
-      this.isWarming = false;
+      isWarming = false;
     }
-  }
+  };
+
+  const warmCache = async (assetIds: string[], priority: CachePriority = 'normal'): Promise<void> => {
+    warmingQueue.push(...assetIds);
+
+    if (!isWarming) {
+      await processWarmingQueue(priority);
+    }
+  };
+
+  return {
+    warmCache
+  };
 }
 
 // Usage: Warm cache for level loading
@@ -641,11 +889,11 @@ await cacheWarmer.warmCache(levelAssets, 'high');
 ### Performance Metrics
 
 ```typescript
-class CacheMetrics {
-  private metrics = new Map<string, CachePerformanceMetrics>();
+function createCacheMetrics() {
+  const metrics = new Map<string, CachePerformanceMetrics>();
 
-  recordCacheAccess(cacheType: string, assetId: string, hit: boolean, accessTime: number): void {
-    const metrics = this.metrics.get(cacheType) || {
+  const recordCacheAccess = (cacheType: string, assetId: string, hit: boolean, accessTime: number): void => {
+    const existingMetrics = metrics.get(cacheType) || {
       cacheType,
       totalAccesses: 0,
       hits: 0,
@@ -656,20 +904,36 @@ class CacheMetrics {
       maxAccessTime: 0
     };
 
-    metrics.totalAccesses++;
-    if (hit) metrics.hits++;
-    else metrics.misses++;
+    existingMetrics.totalAccesses++;
+    if (hit) existingMetrics.hits++;
+    else existingMetrics.misses++;
 
-    metrics.totalAccessTime += accessTime;
-    metrics.averageAccessTime = metrics.totalAccessTime / metrics.totalAccesses;
-    metrics.minAccessTime = Math.min(metrics.minAccessTime, accessTime);
-    metrics.maxAccessTime = Math.max(metrics.maxAccessTime, accessTime);
+    existingMetrics.totalAccessTime += accessTime;
+    existingMetrics.averageAccessTime = existingMetrics.totalAccessTime / existingMetrics.totalAccesses;
+    existingMetrics.minAccessTime = Math.min(existingMetrics.minAccessTime, accessTime);
+    existingMetrics.maxAccessTime = Math.max(existingMetrics.maxAccessTime, accessTime);
 
-    this.metrics.set(cacheType, metrics);
-  }
+    metrics.set(cacheType, existingMetrics);
+  };
 
-  getReport(): CachePerformanceReport {
-    const reports = Array.from(this.metrics.values()).map(metrics => ({
+  const calculateOverallHitRate = (cacheReports: CachePerformanceMetrics[]): number => {
+    const totalHits = cacheReports.reduce((sum, r) => sum + r.hits, 0);
+    const totalAccesses = cacheReports.reduce((sum, r) => sum + r.totalAccesses, 0);
+    return totalAccesses > 0 ? totalHits / totalAccesses : 0;
+  };
+
+  const getTotalMemoryUsage = (): number => {
+    // Implementation for getting total memory usage
+    return 0; // Placeholder
+  };
+
+  const getTotalDiskUsage = (): number => {
+    // Implementation for getting total disk usage
+    return 0; // Placeholder
+  };
+
+  const getReport = (): CachePerformanceReport => {
+    const reports = Array.from(metrics.values()).map(metrics => ({
       ...metrics,
       hitRate: metrics.hits / metrics.totalAccesses,
       missRate: metrics.misses / metrics.totalAccesses
@@ -677,17 +941,16 @@ class CacheMetrics {
 
     return {
       caches: reports,
-      overallHitRate: this.calculateOverallHitRate(reports),
-      totalMemoryUsage: this.getTotalMemoryUsage(),
-      totalDiskUsage: this.getTotalDiskUsage()
+      overallHitRate: calculateOverallHitRate(reports),
+      totalMemoryUsage: getTotalMemoryUsage(),
+      totalDiskUsage: getTotalDiskUsage()
     };
-  }
+  };
 
-  private calculateOverallHitRate(cacheReports: CachePerformanceMetrics[]): number {
-    const totalHits = cacheReports.reduce((sum, r) => sum + r.hits, 0);
-    const totalAccesses = cacheReports.reduce((sum, r) => sum + r.totalAccesses, 0);
-    return totalAccesses > 0 ? totalHits / totalAccesses : 0;
-  }
+  return {
+    recordCacheAccess,
+    getReport
+  };
 }
 
 interface CachePerformanceMetrics {
@@ -707,16 +970,25 @@ interface CachePerformanceMetrics {
 ### Adaptive Cache Policies
 
 ```typescript
-class AdaptiveCachePolicy {
-  private accessPatterns = new Map<string, AccessPattern>();
-  private policyUpdateInterval = 60000; // 1 minute
+function createAdaptiveCachePolicy(policyUpdateInterval = 60000) {
+  const accessPatterns = new Map<string, AccessPattern>();
 
-  constructor() {
-    setInterval(() => this.updatePolicies(), this.policyUpdateInterval);
-  }
+  const updatePolicies = (): void => {
+    // Clean up old access patterns
+    const cutoffTime = Date.now() - 3600000; // 1 hour ago
 
-  getEvictionPolicy(assetId: string): EvictionPolicy {
-    const pattern = this.accessPatterns.get(assetId);
+    for (const [assetId, pattern] of accessPatterns) {
+      if (pattern.lastAccess < cutoffTime) {
+        accessPatterns.delete(assetId);
+      }
+    }
+  };
+
+  // Set up periodic policy updates
+  setInterval(updatePolicies, policyUpdateInterval);
+
+  const getEvictionPolicy = (assetId: string): EvictionPolicy => {
+    const pattern = accessPatterns.get(assetId);
 
     if (!pattern) {
       return 'lru'; // Default policy
@@ -736,11 +1008,11 @@ class AdaptiveCachePolicy {
     }
 
     return 'size'; // Old and infrequently accessed
-  }
+  };
 
-  recordAccess(assetId: string): void {
+  const recordAccess = (assetId: string): void => {
     const now = Date.now();
-    const pattern = this.accessPatterns.get(assetId) || {
+    const pattern = accessPatterns.get(assetId) || {
       assetId,
       firstAccess: now,
       lastAccess: now,
@@ -755,19 +1027,13 @@ class AdaptiveCachePolicy {
     const timeSpan = (now - pattern.firstAccess) / 60000;
     pattern.frequency = pattern.accessCount / Math.max(timeSpan, 1);
 
-    this.accessPatterns.set(assetId, pattern);
-  }
+    accessPatterns.set(assetId, pattern);
+  };
 
-  private updatePolicies(): void {
-    // Clean up old access patterns
-    const cutoffTime = Date.now() - 3600000; // 1 hour ago
-
-    for (const [assetId, pattern] of this.accessPatterns) {
-      if (pattern.lastAccess < cutoffTime) {
-        this.accessPatterns.delete(assetId);
-      }
-    }
-  }
+  return {
+    getEvictionPolicy,
+    recordAccess
+  };
 }
 
 interface AccessPattern {

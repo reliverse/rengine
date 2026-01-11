@@ -166,6 +166,7 @@ export const HEMISPHERE_LIGHT_DEFAULTS = {
 export const UI_DEFAULTS = {
   LIGHTS_VISIBLE: true,
   TRANSFORM_DRAGGING: false,
+  PERFORMANCE_REGRESSION_ON_MOVE: false, // Disable performance regression when moving camera by default
 } as const;
 
 /**

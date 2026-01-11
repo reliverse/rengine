@@ -186,10 +186,6 @@ export function WelcomeScreen() {
     }
   };
 
-  const handleSettings = () => {
-    navigate({ to: "/settings" });
-  };
-
   const getCategoryBadgeClass = (category: string) => {
     switch (category) {
       case "basic":
@@ -274,15 +270,6 @@ export function WelcomeScreen() {
               >
                 <FolderOpen className="mr-3 h-4 w-4" />
                 Load Saved Project
-              </Button>
-
-              <Button
-                className="w-full justify-start"
-                onClick={handleSettings}
-                variant="outline"
-              >
-                <Settings className="mr-3 h-4 w-4" />
-                Editor Settings
               </Button>
 
               {/* Authentication Buttons */}

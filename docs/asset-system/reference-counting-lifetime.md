@@ -30,23 +30,54 @@ Unused → Loading → Loaded → Unloading → Unloaded
 ### Reference Counter
 
 ```typescript
-class AssetReferenceCounter {
-  private references = new Map<string, number>();
-  private loadingAssets = new Set<string>();
-  private unloadingAssets = new Set<string>();
+function createAssetReferenceCounter(assetLoader: AssetLoader) {
+  const references = new Map<string, number>();
+  const loadingAssets = new Set<string>();
+  const unloadingAssets = new Set<string>();
 
-  acquireReference(assetId: string): void {
-    const currentCount = this.references.get(assetId) || 0;
-    this.references.set(assetId, currentCount + 1);
+  const startLoadingAsset = async (assetId: string): Promise<void> => {
+    if (loadingAssets.has(assetId)) return;
+
+    loadingAssets.add(assetId);
+
+    try {
+      await assetLoader.loadAsset(assetId);
+      loadingAssets.delete(assetId);
+    } catch (error) {
+      loadingAssets.delete(assetId);
+      console.error(`Failed to load asset ${assetId}:`, error);
+      // Reset reference count on load failure
+      references.delete(assetId);
+    }
+  };
+
+  const startUnloadingAsset = async (assetId: string): Promise<void> => {
+    if (unloadingAssets.has(assetId)) return;
+
+    unloadingAssets.add(assetId);
+
+    try {
+      await assetLoader.unloadAsset(assetId);
+      unloadingAssets.delete(assetId);
+      references.delete(assetId);
+    } catch (error) {
+      unloadingAssets.delete(assetId);
+      console.error(`Failed to unload asset ${assetId}:`, error);
+    }
+  };
+
+  const acquireReference = (assetId: string): void => {
+    const currentCount = references.get(assetId) || 0;
+    references.set(assetId, currentCount + 1);
 
     // If this is the first reference, start loading
     if (currentCount === 0) {
-      this.startLoadingAsset(assetId);
+      startLoadingAsset(assetId);
     }
-  }
+  };
 
-  releaseReference(assetId: string): void {
-    const currentCount = this.references.get(assetId) || 0;
+  const releaseReference = (assetId: string): void => {
+    const currentCount = references.get(assetId) || 0;
 
     if (currentCount <= 0) {
       console.warn(`Attempting to release reference for unreferenced asset: ${assetId}`);
@@ -54,52 +85,36 @@ class AssetReferenceCounter {
     }
 
     const newCount = currentCount - 1;
-    this.references.set(assetId, newCount);
+    references.set(assetId, newCount);
 
     // If no more references, start unloading
     if (newCount === 0) {
-      this.startUnloadingAsset(assetId);
+      startUnloadingAsset(assetId);
     }
-  }
+  };
 
-  getReferenceCount(assetId: string): number {
-    return this.references.get(assetId) || 0;
-  }
+  const getReferenceCount = (assetId: string): number => {
+    return references.get(assetId) || 0;
+  };
 
-  isAssetLoaded(assetId: string): boolean {
-    return this.references.has(assetId) && this.references.get(assetId)! > 0;
-  }
+  const isAssetLoaded = (assetId: string): boolean => {
+    return references.has(assetId) && references.get(assetId)! > 0;
+  };
 
-  private async startLoadingAsset(assetId: string): Promise<void> {
-    if (this.loadingAssets.has(assetId)) return;
+  const getStats = () => ({
+    totalReferences: Array.from(references.values()).reduce((sum, count) => sum + count, 0),
+    uniqueAssets: references.size,
+    loadingCount: loadingAssets.size,
+    unloadingCount: unloadingAssets.size
+  });
 
-    this.loadingAssets.add(assetId);
-
-    try {
-      await assetLoader.loadAsset(assetId);
-      this.loadingAssets.delete(assetId);
-    } catch (error) {
-      this.loadingAssets.delete(assetId);
-      console.error(`Failed to load asset ${assetId}:`, error);
-      // Reset reference count on load failure
-      this.references.delete(assetId);
-    }
-  }
-
-  private async startUnloadingAsset(assetId: string): Promise<void> {
-    if (this.unloadingAssets.has(assetId)) return;
-
-    this.unloadingAssets.add(assetId);
-
-    try {
-      await assetLoader.unloadAsset(assetId);
-      this.unloadingAssets.delete(assetId);
-      this.references.delete(assetId);
-    } catch (error) {
-      this.unloadingAssets.delete(assetId);
-      console.error(`Failed to unload asset ${assetId}:`, error);
-    }
-  }
+  return {
+    acquireReference,
+    releaseReference,
+    getReferenceCount,
+    isAssetLoaded,
+    getStats
+  };
 }
 ```
 
@@ -108,45 +123,53 @@ class AssetReferenceCounter {
 Provides safe asset access with automatic reference management:
 
 ```typescript
-class AssetHandle<T = any> {
-  private assetId: string;
-  private asset: T | null = null;
-  private disposed = false;
+function createAssetHandle<T = any>(
+  assetId: string,
+  assetReferenceCounter: ReturnType<typeof createAssetReferenceCounter>,
+  assetLoader: AssetLoader
+) {
+  let asset: T | null = null;
+  let disposed = false;
 
-  constructor(assetId: string) {
-    this.assetId = assetId;
-    assetReferenceCounter.acquireReference(assetId);
-  }
+  // Acquire reference immediately
+  assetReferenceCounter.acquireReference(assetId);
 
-  async getAsset(): Promise<T> {
-    if (this.disposed) {
+  const getAsset = async (): Promise<T> => {
+    if (disposed) {
       throw new Error('Asset handle has been disposed');
     }
 
-    if (this.asset) {
-      return this.asset;
+    if (asset) {
+      return asset;
     }
 
     // Wait for asset to load
-    this.asset = await assetLoader.getLoadedAsset(this.assetId);
-    return this.asset;
-  }
+    asset = await assetLoader.getLoadedAsset(assetId);
+    return asset;
+  };
 
-  dispose(): void {
-    if (this.disposed) return;
+  const dispose = (): void => {
+    if (disposed) return;
 
-    this.disposed = true;
-    this.asset = null;
-    assetReferenceCounter.releaseReference(this.assetId);
-  }
+    disposed = true;
+    asset = null;
+    assetReferenceCounter.releaseReference(assetId);
+  };
 
-  isValid(): boolean {
-    return !this.disposed && assetReferenceCounter.isAssetLoaded(this.assetId);
-  }
+  const isValid = (): boolean => {
+    return !disposed && assetReferenceCounter.isAssetLoaded(assetId);
+  };
 
-  getAssetId(): string {
-    return this.assetId;
-  }
+  const getAssetId = (): string => {
+    return assetId;
+  };
+
+  return {
+    getAsset,
+    dispose,
+    isValid,
+    getAssetId
+  };
 }
 
 // Usage with automatic cleanup

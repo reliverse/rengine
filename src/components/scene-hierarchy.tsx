@@ -1,469 +1,352 @@
 import {
+  Box,
   ChevronDown,
   ChevronRight,
+  Circle,
   Eye,
   EyeOff,
-  Plus,
-  Search,
-  Trash2,
+  Lightbulb,
+  Moon,
+  Package,
+  Square,
+  Sun,
+  Zap,
 } from "lucide-react";
-import { useState } from "react";
-import { Button } from "~/components/ui/button";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "~/components/ui/context-menu";
-import { Input } from "~/components/ui/input";
-import { ScrollArea } from "~/components/ui/scroll-area";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
+import { memo, useCallback, useMemo, useState } from "react";
+// import { FixedSizeTree as Tree } from "react-vtree";
+import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
-import type { SceneLight, SceneObject } from "~/stores/scene-store";
 import { useSceneStore } from "~/stores/scene-store";
 
-interface HierarchyItemProps {
-  object: SceneObject;
+// Regex for UUID validation
+const UUID_REGEX = /^[0-9a-f-]+$/;
+
+// Tree node data structure
+interface TreeNode {
+  id: string;
+  name: string;
+  type: "object" | "light" | "group";
+  children?: TreeNode[];
   level: number;
-  searchTerm: string;
+  isExpanded?: boolean;
+  isSelected?: boolean;
+  isVisible?: boolean;
+  objectType?: string;
+  data?: unknown;
 }
 
-interface LightHierarchyItemProps {
-  light: SceneLight;
-  level: number;
-  searchTerm: string;
-}
+// Tree node component
+const TreeNodeComponent = memo(function TreeNodeComponent({
+  node,
+  onToggle,
+  onSelect,
+  onToggleVisibility,
+}: {
+  node: TreeNode;
+  onToggle: (nodeId: string) => void;
+  onSelect: (nodeId: string) => void;
+  onToggleVisibility: (nodeId: string) => void;
+}) {
+  const hasChildren = node.children && node.children.length > 0;
+  const isExpanded = node.isExpanded;
 
-function HierarchyItem({ object, level, searchTerm }: HierarchyItemProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const {
-    selectedObjectIds,
-    selectObject,
-    updateObject,
-    removeObject,
-    duplicateObject,
-  } = useSceneStore();
+  const handleToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onToggle(node.id);
+    },
+    [node.id, onToggle]
+  );
 
-  const isSelected = selectedObjectIds.includes(object.id);
-  const hren = false; // For now, no grouping support yet
+  const handleSelect = useCallback(() => {
+    onSelect(node.id);
+  }, [node.id, onSelect]);
 
-  const handleSelect = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    const multiSelect = event.ctrlKey || event.metaKey;
-    selectObject(object.id, multiSelect);
-  };
+  const handleToggleVisibility = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onToggleVisibility(node.id);
+    },
+    [node.id, onToggleVisibility]
+  );
 
-  const handleToggleVisibility = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    updateObject(object.id, { visible: !object.visible });
-  };
+  const getIcon = () => {
+    if (node.type === "light") {
+      switch (node.objectType) {
+        case "directional":
+          return <Sun className="h-4 w-4" />;
+        case "point":
+          return <Zap className="h-4 w-4" />;
+        case "spot":
+          return <Lightbulb className="h-4 w-4" />;
+        default:
+          return <Moon className="h-4 w-4" />;
+      }
+    }
 
-  const handleDuplicate = () => {
-    duplicateObject(object.id);
-  };
-
-  const handleDelete = () => {
-    removeObject(object.id);
-  };
-
-  const getObjectIcon = (type: SceneObject["type"]) => {
-    switch (type) {
+    switch (node.objectType) {
       case "cube":
-        return "⬜";
+        return <Box className="h-4 w-4" />;
       case "sphere":
-        return "⭕";
+        return <Circle className="h-4 w-4" />;
       case "plane":
-        return "▬";
+        return <Square className="h-4 w-4" />;
       case "imported":
-        return "📦";
+        return <Package className="h-4 w-4" />;
       default:
-        return "❓";
+        return <Package className="h-4 w-4" />;
     }
   };
 
-  // Highlight search matches
-  const displayName = object.name;
-  const isMatch =
-    searchTerm && displayName.toLowerCase().includes(searchTerm.toLowerCase());
-
-  if (searchTerm && !isMatch) {
-    return null;
-  }
-
   return (
-    <ContextMenu>
-      <ContextMenuTrigger>
-        {/* biome-ignore lint/a11y/useSemanticElements: ContextMenuTrigger requires div element */}
-        <div
-          className={cn(
-            "group flex w-full cursor-pointer items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent",
-            isSelected && "bg-accent text-accent-foreground",
-            isMatch && "bg-yellow-100 dark:bg-yellow-900"
-          )}
-          onClick={handleSelect}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              e.stopPropagation();
-              const multiSelect = e.ctrlKey || e.metaKey;
-              selectObject(object.id, multiSelect);
-            }
-          }}
-          role="button"
-          style={{ paddingLeft: `${level * 12 + 8}px` }}
-          tabIndex={0}
-        >
-          {/* Expand/Collapse for future grouping */}
-          {hren ? (
-            <Button
-              className="h-4 w-4 p-0 hover:bg-muted"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsExpanded(!isExpanded);
+    <div>
+      <button
+        className={cn(
+          "flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-accent/50",
+          node.isSelected && "bg-accent",
+          "select-none"
+        )}
+        onClick={handleSelect}
+        style={{ paddingLeft: `${node.level * 16 + 8}px` }}
+        type="button"
+      >
+        {/* Expansion Toggle */}
+        <div className="flex h-4 w-4 items-center justify-center">
+          {hasChildren && (
+            // biome-ignore lint/a11y/useSemanticElements: <role="button" is required here (<button> cannot be used because hydrataion error)>
+            <div
+              className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-md font-medium text-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              onClick={handleToggle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onToggle(node.id);
+                }
               }}
-              size="sm"
-              variant="ghost"
+              role="button"
+              tabIndex={0}
             >
               {isExpanded ? (
                 <ChevronDown className="h-3 w-3" />
               ) : (
                 <ChevronRight className="h-3 w-3" />
               )}
-            </Button>
-          ) : (
-            <div className="w-4" />
+            </div>
           )}
-
-          {/* Object Icon */}
-          <span className="text-xs">{getObjectIcon(object.type)}</span>
-
-          {/* Object Name */}
-          <span className="flex-1 truncate">{displayName}</span>
-
-          {/* Visibility Toggle */}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  className="h-4 w-4 p-0 opacity-0 hover:bg-muted group-hover:opacity-100"
-                  onClick={handleToggleVisibility}
-                  size="sm"
-                  variant="ghost"
-                >
-                  {object.visible ? (
-                    <Eye className="h-3 w-3" />
-                  ) : (
-                    <EyeOff className="h-3 w-3 opacity-50" />
-                  )}
-                </Button>
-              }
-            />
-            <TooltipContent>
-              {object.visible ? "Hide object" : "Show object"}
-            </TooltipContent>
-          </Tooltip>
         </div>
-      </ContextMenuTrigger>
 
-      <ContextMenuContent>
-        <ContextMenuItem onClick={handleSelect}>Select</ContextMenuItem>
-        <ContextMenuItem onClick={handleDuplicate}>Duplicate</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className="text-muted-foreground"
-          onClick={handleToggleVisibility}
-        >
-          {object.visible ? "Hide" : "Show"}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={handleDelete}
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
-function LightHierarchyItem({
-  light,
-  level,
-  searchTerm,
-}: LightHierarchyItemProps) {
-  const {
-    selectedLightIds,
-    selectLight,
-    updateLight,
-    removeLight,
-    duplicateLight,
-  } = useSceneStore();
-
-  const isSelected = selectedLightIds.includes(light.id);
-
-  const handleSelect = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    const multiSelect = event.ctrlKey || event.metaKey;
-    selectLight(light.id, multiSelect);
-  };
-
-  const handleToggleVisibility = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    updateLight(light.id, { visible: !light.visible });
-  };
-
-  const handleDuplicate = () => {
-    duplicateLight(light.id);
-  };
-
-  const handleDelete = () => {
-    removeLight(light.id);
-  };
-
-  const getLightIcon = (type: SceneLight["type"]) => {
-    switch (type) {
-      case "directional":
-        return "☀️";
-      case "point":
-        return "💡";
-      case "spot":
-        return "🔦";
-      case "ambient":
-        return "🌟";
-      case "hemisphere":
-        return "🌅";
-      default:
-        return "❓";
-    }
-  };
-
-  // Highlight search matches
-  const displayName = light.name;
-  const isMatch =
-    searchTerm && displayName.toLowerCase().includes(searchTerm.toLowerCase());
-
-  if (searchTerm && !isMatch) {
-    return null;
-  }
-
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger>
-        {/* biome-ignore lint/a11y/useSemanticElements: ContextMenuTrigger requires div element */}
+        {/* Visibility Toggle */}
+        {/** biome-ignore lint/a11y/useSemanticElements: <role="button" is required here (<button> cannot be used because hydrataion error)> */}
         <div
-          className={cn(
-            "group flex w-full cursor-pointer items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent",
-            isSelected && "bg-accent text-accent-foreground",
-            isMatch && "bg-yellow-100 dark:bg-yellow-900"
-          )}
-          onClick={handleSelect}
+          className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-md font-medium text-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          onClick={handleToggleVisibility}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              e.stopPropagation();
-              const multiSelect = e.ctrlKey || e.metaKey;
-              selectLight(light.id, multiSelect);
+              onToggleVisibility(node.id);
             }
           }}
           role="button"
-          style={{ paddingLeft: `${level * 12 + 8}px` }}
           tabIndex={0}
         >
-          {/* Light Icon */}
-          <span className="text-xs">{getLightIcon(light.type)}</span>
-
-          {/* Light Name */}
-          <span className="flex-1 truncate">{displayName}</span>
-
-          {/* Visibility Toggle */}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  className="h-4 w-4 p-0 opacity-0 hover:bg-muted group-hover:opacity-100"
-                  onClick={handleToggleVisibility}
-                  size="sm"
-                  variant="ghost"
-                >
-                  {light.visible ? (
-                    <Eye className="h-3 w-3" />
-                  ) : (
-                    <EyeOff className="h-3 w-3 opacity-50" />
-                  )}
-                </Button>
-              }
-            />
-            <TooltipContent>
-              {light.visible ? "Hide light" : "Show light"}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </ContextMenuTrigger>
-
-      <ContextMenuContent>
-        <ContextMenuItem onClick={handleSelect}>Select</ContextMenuItem>
-        <ContextMenuItem onClick={handleDuplicate}>Duplicate</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className="text-muted-foreground"
-          onClick={handleToggleVisibility}
-        >
-          {light.visible ? "Hide" : "Show"}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={handleDelete}
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
-interface SceneHierarchyProps {
-  className?: string;
-}
-
-export function SceneHierarchy({ className }: SceneHierarchyProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const objects = useSceneStore((state) => state.objects);
-  const lights = useSceneStore((state) => state.lights);
-  const objectCount = objects.length;
-  const lightCount = lights.length;
-  const visibleObjectCount = objects.filter((obj) => obj.visible).length;
-  const visibleLightCount = lights.filter((light) => light.visible).length;
-
-  const filteredObjects = objects.filter((obj) =>
-    searchTerm
-      ? obj.name.toLowerCase().includes(searchTerm.toLowerCase())
-      : true
-  );
-
-  const filteredLights = lights.filter((light) =>
-    searchTerm
-      ? light.name.toLowerCase().includes(searchTerm.toLowerCase())
-      : true
-  );
-
-  return (
-    <div className={cn("flex h-full flex-col", className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between border-b p-4">
-        <div>
-          <h3 className="font-semibold text-sm">Scene Hierarchy</h3>
-          <p className="text-muted-foreground text-xs">
-            {visibleObjectCount + visibleLightCount}/{objectCount + lightCount}{" "}
-            visible
-          </p>
-        </div>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button className="h-8 w-8 p-0" size="sm" variant="ghost">
-                <Plus className="h-4 w-4" />
-              </Button>
-            }
-          />
-          <TooltipContent>Add object/light (use toolbar)</TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* Search */}
-      <div className="border-b p-4">
-        <div className="relative">
-          <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="h-8 pl-8"
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search objects and lights..."
-            value={searchTerm}
-          />
-        </div>
-      </div>
-
-      {/* Scene Elements List */}
-      <ScrollArea className="flex-1">
-        <div className="p-2">
-          {filteredObjects.length === 0 && filteredLights.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-muted-foreground text-sm">
-                {searchTerm
-                  ? "No objects or lights match your search"
-                  : "No objects or lights in scene"}
-              </p>
-              <p className="mt-1 text-muted-foreground text-xs">
-                {searchTerm
-                  ? "Try a different search term"
-                  : "Add objects and lights using the toolbar"}
-              </p>
-            </div>
+          {node.isVisible ? (
+            <Eye className="h-3 w-3" />
           ) : (
-            <>
-              {/* Lights Section */}
-              {filteredLights.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="mb-2 px-2 font-medium text-muted-foreground text-xs">
-                    Lights ({filteredLights.length})
-                  </h4>
-                  {filteredLights.map((light) => (
-                    <LightHierarchyItem
-                      key={light.id}
-                      level={0}
-                      light={light}
-                      searchTerm={searchTerm}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Objects Section */}
-              {filteredObjects.length > 0 && (
-                <div>
-                  <h4 className="mb-2 px-2 font-medium text-muted-foreground text-xs">
-                    Objects ({filteredObjects.length})
-                  </h4>
-                  {filteredObjects.map((object) => (
-                    <HierarchyItem
-                      key={object.id}
-                      level={0}
-                      object={object}
-                      searchTerm={searchTerm}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+            <EyeOff className="h-3 w-3 opacity-50" />
           )}
         </div>
-      </ScrollArea>
 
-      {/* Footer with stats */}
-      {(objectCount > 0 || lightCount > 0) && (
-        <div className="border-t bg-muted/50 p-2">
-          <div className="grid grid-cols-2 gap-2 text-muted-foreground text-xs">
-            <div className="text-center">
-              <span>
-                Objects: {visibleObjectCount}/{objectCount}
-              </span>
-            </div>
-            <div className="text-center">
-              <span>
-                Lights: {visibleLightCount}/{lightCount}
-              </span>
-            </div>
+        {/* Icon */}
+        <div className="shrink-0 text-muted-foreground">{getIcon()}</div>
+
+        {/* Name */}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm" title={node.name}>
+            {node.name}
           </div>
+        </div>
+
+        {/* Type Badge */}
+        <Badge className="px-1 py-0 text-xs" variant="outline">
+          {node.objectType}
+        </Badge>
+      </button>
+
+      {/* Children */}
+      {hasChildren && isExpanded && (
+        <div>
+          {node.children?.map((child) => (
+            <TreeNodeComponent
+              key={child.id}
+              node={child}
+              onSelect={onSelect}
+              onToggle={onToggle}
+              onToggleVisibility={onToggleVisibility}
+            />
+          ))}
         </div>
       )}
     </div>
   );
-}
+});
+
+// Main scene hierarchy component
+export const SceneHierarchy = memo(function SceneHierarchy({
+  className,
+}: {
+  className?: string;
+}) {
+  const objects = useSceneStore((state) => state.objects);
+  const lights = useSceneStore((state) => state.lights);
+  const selectedObjectIds = useSceneStore((state) => state.selectedObjectIds);
+  const selectedLightIds = useSceneStore((state) => state.selectedLightIds);
+  const { selectObject, selectLight, updateObject, updateLight } =
+    useSceneStore();
+
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
+    new Set(["root"])
+  );
+
+  // Build tree structure
+  const treeData = useMemo(() => {
+    const buildTree = (): TreeNode => {
+      const rootNode: TreeNode = {
+        id: "root",
+        name: "Scene",
+        type: "group",
+        level: 0,
+        isExpanded: expandedNodes.has("root"),
+        children: [],
+      };
+
+      // Add lights group
+      if (lights.length > 0) {
+        const lightsGroup: TreeNode = {
+          id: "lights",
+          name: "Lights",
+          type: "group",
+          level: 1,
+          isExpanded: expandedNodes.has("lights"),
+          children: lights.map((light) => ({
+            id: light.id,
+            name: light.name,
+            type: "light" as const,
+            objectType: light.type,
+            level: 2,
+            isSelected: selectedLightIds.includes(light.id),
+            isVisible: light.visible,
+            data: light,
+          })),
+        };
+        rootNode.children?.push(lightsGroup);
+      }
+
+      // Add objects group
+      if (objects.length > 0) {
+        const objectsGroup: TreeNode = {
+          id: "objects",
+          name: "Objects",
+          type: "group",
+          level: 1,
+          isExpanded: expandedNodes.has("objects"),
+          children: objects.map((object) => ({
+            id: object.id,
+            name: object.name,
+            type: "object" as const,
+            objectType: object.type,
+            level: 2,
+            isSelected: selectedObjectIds.includes(object.id),
+            isVisible: object.visible,
+            data: object,
+          })),
+        };
+        rootNode.children?.push(objectsGroup);
+      }
+
+      return rootNode;
+    };
+
+    return buildTree();
+  }, [objects, lights, selectedObjectIds, selectedLightIds, expandedNodes]);
+
+  const handleToggle = useCallback((nodeId: string) => {
+    setExpandedNodes((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId);
+      } else {
+        newSet.add(nodeId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleSelect = useCallback(
+    (nodeId: string) => {
+      if (nodeId.startsWith("light_")) {
+        selectLight(nodeId, false);
+      } else if (nodeId.startsWith("object_") || UUID_REGEX.test(nodeId)) {
+        selectObject(nodeId, false);
+      }
+    },
+    [selectObject, selectLight]
+  );
+
+  const handleToggleVisibility = useCallback(
+    (nodeId: string) => {
+      if (nodeId.startsWith("light_")) {
+        const light = lights.find((l) => l.id === nodeId);
+        if (light) {
+          updateLight(nodeId, { visible: !light.visible });
+        }
+      } else {
+        const object = objects.find((o) => o.id === nodeId);
+        if (object) {
+          updateObject(nodeId, { visible: !object.visible });
+        }
+      }
+    },
+    [lights, objects, updateLight, updateObject]
+  );
+
+  if (objects.length === 0 && lights.length === 0) {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-center text-muted-foreground",
+          className
+        )}
+      >
+        <div className="text-center">
+          <div className="mb-2 text-2xl">🌳</div>
+          <div className="text-sm">Scene hierarchy is empty</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("overflow-hidden rounded-lg border", className)}>
+      {/* Header */}
+      <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">
+        <div className="font-medium text-sm">Scene Hierarchy</div>
+        <Badge className="text-xs" variant="secondary">
+          {objects.length + lights.length}
+        </Badge>
+      </div>
+
+      {/* Tree */}
+      <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent max-h-96 overflow-auto">
+        {(treeData.children || []).map((node) => (
+          <TreeNodeComponent
+            key={node.id}
+            node={node}
+            onSelect={handleSelect}
+            onToggle={handleToggle}
+            onToggleVisibility={handleToggleVisibility}
+          />
+        ))}
+      </div>
+    </div>
+  );
+});

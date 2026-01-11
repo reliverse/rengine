@@ -57,63 +57,112 @@ interface RenderSystem {
 Central system management:
 
 ```typescript
-class SystemRegistry {
-  private systems = new Map<string, System>();
-  private updateSystems: UpdateSystem[] = [];
-  private eventSystems = new Map<string, EventSystem<any>[]>();
+function createSystemRegistry() {
+  const systems = new Map<string, System>();
+  const updateSystems: UpdateSystem[] = [];
+  const eventSystems = new Map<string, EventSystem<any>[]>();
 
-  register(system: System): void {
-    this.systems.set(system.name, system);
+  const isUpdateSystem = (system: System): system is UpdateSystem => {
+    return 'update' in system && typeof system.update === 'function';
+  };
 
-    if (this.isUpdateSystem(system)) {
-      this.updateSystems.push(system);
-      this.updateSystems.sort((a, b) => a.priority - b.priority);
+  const isEventSystem = (system: System): system is EventSystem<any> => {
+    return 'eventType' in system && 'handle' in system;
+  };
+
+  const register = (system: System): void => {
+    systems.set(system.name, system);
+
+    if (isUpdateSystem(system)) {
+      updateSystems.push(system);
+      updateSystems.sort((a, b) => a.priority - b.priority);
     }
 
-    if (this.isEventSystem(system)) {
+    if (isEventSystem(system)) {
       const eventType = system.eventType;
-      if (!this.eventSystems.has(eventType)) {
-        this.eventSystems.set(eventType, []);
+      if (!eventSystems.has(eventType)) {
+        eventSystems.set(eventType, []);
       }
-      this.eventSystems.get(eventType)!.push(system);
+      eventSystems.get(eventType)!.push(system);
     }
-  }
+  };
 
-  update(deltaTime: number): void {
-    for (const system of this.updateSystems) {
+  const update = (deltaTime: number): void => {
+    for (const system of updateSystems) {
       system.update(deltaTime);
     }
-  }
+  };
 
-  dispatchEvent(event: Event): void {
-    const systems = this.eventSystems.get(event.type) || [];
+  const dispatchEvent = (event: Event): void => {
+    const systems = eventSystems.get(event.type) || [];
     for (const system of systems) {
       system.handle(event);
     }
-  }
+  };
+
+  const unregister = (systemName: string): void => {
+    const system = systems.get(systemName);
+    if (!system) return;
+
+    systems.delete(systemName);
+
+    // Remove from update systems
+    const updateIndex = updateSystems.findIndex(s => s.name === systemName);
+    if (updateIndex !== -1) {
+      updateSystems.splice(updateIndex, 1);
+    }
+
+    // Remove from event systems
+    if (isEventSystem(system)) {
+      const eventTypeSystems = eventSystems.get(system.eventType) || [];
+      const eventIndex = eventTypeSystems.findIndex(s => s.name === systemName);
+      if (eventIndex !== -1) {
+        eventTypeSystems.splice(eventIndex, 1);
+        if (eventTypeSystems.length === 0) {
+          eventSystems.delete(system.eventType);
+        }
+      }
+    }
+  };
+
+  return {
+    register,
+    unregister,
+    update,
+    dispatchEvent
+  };
 }
 ```
 
 ### System Base Classes
 
 ```typescript
-abstract class BaseSystem implements UpdateSystem {
-  abstract readonly name: string;
-  abstract readonly priority: number;
-
-  protected queryEntities(componentTypes: ComponentType[]): Entity[] {
+function createBaseSystem(
+  name: string,
+  priority: number,
+  entityRegistry: EntityRegistry
+): Pick<UpdateSystem, 'name' | 'priority'> & {
+  queryEntities: (componentTypes: ComponentType[]) => Entity[];
+  getComponent: <T extends Component>(entity: Entity, type: ComponentType) => T | undefined;
+} {
+  const queryEntities = (componentTypes: ComponentType[]): Entity[] => {
     // Query entities with specific component combinations
     return entityRegistry.query(componentTypes);
-  }
+  };
 
-  protected getComponent<T extends Component>(
+  const getComponent = <T extends Component>(
     entity: Entity,
     type: ComponentType
-  ): T | undefined {
+  ): T | undefined => {
     return entity.components.get(type) as T | undefined;
-  }
+  };
 
-  abstract update(deltaTime: number): void;
+  return {
+    name,
+    priority,
+    queryEntities,
+    getComponent
+  };
 }
 ```
 

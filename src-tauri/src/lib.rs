@@ -1,8 +1,11 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
+use base64::{engine::general_purpose, Engine as _};
+use photon_rs::native::{open_image, save_image};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::fs::read_dir;
+use std::io::Read;
 use thiserror::Error;
 // Cross-platform permission handling
 fn get_permission_number(permissions: &fs::Permissions) -> u32 {
@@ -46,6 +49,12 @@ pub enum RengineError {
 
     #[error("Clipboard operation failed")]
     ClipboardFailed,
+
+    #[error("Invalid image file: {path}")]
+    InvalidImageFile { path: String },
+
+    #[error("Unsupported image format: {format}")]
+    UnsupportedImageFormat { format: String },
 }
 
 // File system entry models
@@ -395,6 +404,464 @@ async fn write_log_file(content: String, path: String) -> Result<(), String> {
     Ok(())
 }
 
+// Texture-specific commands
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ImageMetadata {
+    pub width: u32,
+    pub height: u32,
+    pub format: String,
+    pub size_bytes: u64,
+}
+
+#[tauri::command]
+async fn read_image_as_base64(file_path: String) -> Result<String, String> {
+    // Read the file as bytes
+    let mut file = fs::File::open(&file_path).map_err(|err| {
+        log_error!("Failed to open image file {}: {}", file_path, err);
+        RengineError::FileReadFailed {
+            path: file_path.clone(),
+            details: err.to_string(),
+        }
+        .to_string()
+    })?;
+
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).map_err(|err| {
+        log_error!("Failed to read image file {}: {}", file_path, err);
+        RengineError::FileReadFailed {
+            path: file_path.clone(),
+            details: err.to_string(),
+        }
+        .to_string()
+    })?;
+
+    // Convert to base64
+    let base64_string = general_purpose::STANDARD.encode(&buffer);
+
+    // Detect MIME type based on file extension
+    let mime_type = match Path::new(&file_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "bmp" => "image/bmp",
+        "tiff" | "tif" => "image/tiff",
+        "tga" => "image/x-tga",
+        "dds" => "image/vnd-ms.dds",
+        "hdr" => "image/vnd.radiance",
+        "exr" => "image/x-exr",
+        _ => "application/octet-stream",
+    };
+
+    Ok(format!("data:{};base64,{}", mime_type, base64_string))
+}
+
+#[tauri::command]
+async fn get_image_metadata(file_path: String) -> Result<ImageMetadata, String> {
+    // For basic metadata, we can try to read the file and get basic info
+    // For full image metadata (width, height), we'd need an image processing library
+    // For now, return basic file info
+
+    let metadata = fs::metadata(&file_path).map_err(|err| {
+        log_error!("Failed to get metadata for {}: {}", file_path, err);
+        RengineError::FileReadFailed {
+            path: file_path.clone(),
+            details: err.to_string(),
+        }
+        .to_string()
+    })?;
+
+    // Detect format from extension
+    let format = Path::new(&file_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("unknown")
+        .to_uppercase();
+
+    // Try to open the image with photon-rs to get actual dimensions
+    let (width, height) = match open_image(&file_path) {
+        Ok(photon_img) => {
+            let w = photon_img.get_width() as u32;
+            let h = photon_img.get_height() as u32;
+            (w, h)
+        }
+        Err(err) => {
+            log_warn!(
+                "Failed to open image with photon-rs, using fallback: {}",
+                err
+            );
+            // Fallback to basic metadata if photon-rs can't read the file
+            (0, 0)
+        }
+    };
+
+    Ok(ImageMetadata {
+        width,
+        height,
+        format,
+        size_bytes: metadata.len(),
+    })
+}
+
+#[tauri::command]
+async fn save_texture_to_file(
+    file_path: String,
+    base64_data: String,
+    _format: String,
+) -> Result<(), String> {
+    // Remove data URL prefix if present
+    let base64_clean = if base64_data.starts_with("data:") {
+        base64_data.split(',').nth(1).unwrap_or(&base64_data)
+    } else {
+        &base64_data
+    };
+
+    // Decode base64
+    let image_data = general_purpose::STANDARD
+        .decode(base64_clean)
+        .map_err(|err| {
+            log_error!("Failed to decode base64 data: {}", err);
+            format!("Failed to decode base64 data: {}", err)
+        })?;
+
+    // Ensure parent directory exists
+    if let Some(parent) = Path::new(&file_path).parent() {
+        fs::create_dir_all(parent).map_err(|err| {
+            log_error!(
+                "Failed to create parent directories for {}: {}",
+                file_path,
+                err
+            );
+            RengineError::FileWriteFailed {
+                path: file_path.clone(),
+                details: err.to_string(),
+            }
+            .to_string()
+        })?;
+    }
+
+    // Write file
+    fs::write(&file_path, &image_data).map_err(|err| {
+        log_error!("Failed to write texture to {}: {}", file_path, err);
+        RengineError::FileWriteFailed {
+            path: file_path.clone(),
+            details: err.to_string(),
+        }
+        .to_string()
+    })?;
+
+    log_info!("Successfully saved texture to {}", file_path.as_str());
+    Ok(())
+}
+
+#[tauri::command]
+async fn batch_process_textures(
+    operations: Vec<TextureOperation>,
+) -> Result<Vec<TextureOperationResult>, String> {
+    let mut results = Vec::new();
+
+    for operation in operations {
+        let result = match operation.operation_type.as_str() {
+            "copy" => {
+                if let (Some(source), Some(destination)) =
+                    (&operation.source_path, &operation.destination_path)
+                {
+                    match fs::copy(source, destination) {
+                        Ok(_) => TextureOperationResult {
+                            operation_id: operation.id,
+                            success: true,
+                            error: None,
+                        },
+                        Err(err) => TextureOperationResult {
+                            operation_id: operation.id,
+                            success: false,
+                            error: Some(err.to_string()),
+                        },
+                    }
+                } else {
+                    TextureOperationResult {
+                        operation_id: operation.id,
+                        success: false,
+                        error: Some("Missing source or destination path".to_string()),
+                    }
+                }
+            }
+            "delete" => {
+                if let Some(path) = &operation.source_path {
+                    match fs::remove_file(path) {
+                        Ok(_) => TextureOperationResult {
+                            operation_id: operation.id,
+                            success: true,
+                            error: None,
+                        },
+                        Err(err) => TextureOperationResult {
+                            operation_id: operation.id,
+                            success: false,
+                            error: Some(err.to_string()),
+                        },
+                    }
+                } else {
+                    TextureOperationResult {
+                        operation_id: operation.id,
+                        success: false,
+                        error: Some("Missing source path".to_string()),
+                    }
+                }
+            }
+            "rename" => {
+                if let (Some(source), Some(destination)) =
+                    (&operation.source_path, &operation.destination_path)
+                {
+                    match fs::rename(source, destination) {
+                        Ok(_) => TextureOperationResult {
+                            operation_id: operation.id,
+                            success: true,
+                            error: None,
+                        },
+                        Err(err) => TextureOperationResult {
+                            operation_id: operation.id,
+                            success: false,
+                            error: Some(err.to_string()),
+                        },
+                    }
+                } else {
+                    TextureOperationResult {
+                        operation_id: operation.id,
+                        success: false,
+                        error: Some("Missing source or destination path".to_string()),
+                    }
+                }
+            }
+            _ => TextureOperationResult {
+                operation_id: operation.id,
+                success: false,
+                error: Some(format!(
+                    "Unknown operation type: {}",
+                    operation.operation_type
+                )),
+            },
+        };
+
+        results.push(result);
+    }
+
+    Ok(results)
+}
+
+#[tauri::command]
+async fn process_image(
+    input_path: String,
+    output_path: String,
+    operations: Vec<ImageOperation>,
+) -> Result<ProcessedImageMetadata, String> {
+    // Load the image
+    let mut img = open_image(&input_path).map_err(|err| {
+        log_error!("Failed to open image {}: {}", input_path, err);
+        format!("Failed to open image: {}", err)
+    })?;
+
+    // Apply operations
+    for operation in operations {
+        match operation.operation_type.as_str() {
+            "resize" => {
+                if let (Some(width), Some(height)) = (operation.width, operation.height) {
+                    photon_rs::transform::resize(
+                        &mut img,
+                        width,
+                        height,
+                        photon_rs::transform::SamplingFilter::Lanczos3,
+                    );
+                    log_info!("Resized image to {}x{}", width, height);
+                }
+            }
+            "filter" => {
+                if let Some(filter_name) = &operation.filter_name {
+                    match filter_name.as_str() {
+                        "oceanic" => photon_rs::filters::filter(&mut img, "oceanic"),
+                        "islands" => photon_rs::filters::filter(&mut img, "islands"),
+                        "marine" => photon_rs::filters::filter(&mut img, "marine"),
+                        "seagreen" => photon_rs::filters::filter(&mut img, "seagreen"),
+                        "flagblue" => photon_rs::filters::filter(&mut img, "flagblue"),
+                        "liquid" => photon_rs::filters::filter(&mut img, "liquid"),
+                        "diamante" => photon_rs::filters::filter(&mut img, "diamante"),
+                        "radio" => photon_rs::filters::filter(&mut img, "radio"),
+                        "twenties" => photon_rs::filters::filter(&mut img, "twenties"),
+                        "rosetint" => photon_rs::filters::filter(&mut img, "rosetint"),
+                        "mauve" => photon_rs::filters::filter(&mut img, "mauve"),
+                        "bluechrome" => photon_rs::filters::filter(&mut img, "bluechrome"),
+                        "vintage" => photon_rs::filters::filter(&mut img, "vintage"),
+                        "perfume" => photon_rs::filters::filter(&mut img, "perfume"),
+                        "serenity" => photon_rs::filters::filter(&mut img, "serenity"),
+                        _ => {
+                            log_warn!("Unknown filter: {}", filter_name);
+                        }
+                    }
+                }
+            }
+            "effect" => {
+                if let Some(effect_name) = &operation.effect_name {
+                    match effect_name.as_str() {
+                        "solarize" => photon_rs::effects::solarize(&mut img),
+                        "invert" => photon_rs::channels::invert(&mut img),
+                        "grayscale" => photon_rs::monochrome::grayscale(&mut img),
+                        "sepia" => photon_rs::monochrome::sepia(&mut img),
+                        _ => {
+                            log_warn!("Unknown effect: {}", effect_name);
+                        }
+                    }
+                }
+            }
+            "adjust" => {
+                if let Some(brightness) = operation.brightness {
+                    photon_rs::colour_spaces::lighten_hsl(&mut img, brightness as f32);
+                }
+                if let Some(saturation) = operation.saturation {
+                    photon_rs::colour_spaces::saturate_hsl(&mut img, saturation as f32);
+                }
+            }
+            _ => {
+                log_warn!("Unknown operation type: {}", operation.operation_type);
+            }
+        }
+    }
+
+    // Save the processed image
+    save_image(img, &output_path).map_err(|err| {
+        log_error!("Failed to save processed image to {}: {}", output_path, err);
+        format!("Failed to save processed image: {}", err)
+    })?;
+
+    // Get final metadata
+    let final_img = open_image(&output_path).map_err(|err| {
+        log_error!("Failed to reopen processed image {}: {}", output_path, err);
+        format!("Failed to reopen processed image: {}", err)
+    })?;
+
+    let final_metadata = fs::metadata(&output_path).map_err(|err| {
+        log_error!(
+            "Failed to get metadata for processed image {}: {}",
+            output_path,
+            err
+        );
+        format!("Failed to get metadata: {}", err)
+    })?;
+
+    // Convert to base64 for frontend
+    let mut file = fs::File::open(&output_path).map_err(|err| {
+        log_error!(
+            "Failed to open processed image for base64 conversion {}: {}",
+            output_path,
+            err
+        );
+        format!("Failed to open processed image: {}", err)
+    })?;
+
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).map_err(|err| {
+        log_error!("Failed to read processed image {}: {}", output_path, err);
+        format!("Failed to read processed image: {}", err)
+    })?;
+
+    let base64_data = general_purpose::STANDARD.encode(&buffer);
+    let mime_type = match Path::new(&output_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        _ => "application/octet-stream",
+    };
+
+    Ok(ProcessedImageMetadata {
+        width: final_img.get_width() as u32,
+        height: final_img.get_height() as u32,
+        format: mime_type.to_string(),
+        size_bytes: final_metadata.len(),
+        base64_data: format!("data:{};base64,{}", mime_type, base64_data),
+    })
+}
+
+#[tauri::command]
+async fn get_supported_filters() -> Result<Vec<String>, String> {
+    Ok(vec![
+        "oceanic".to_string(),
+        "islands".to_string(),
+        "marine".to_string(),
+        "seagreen".to_string(),
+        "flagblue".to_string(),
+        "liquid".to_string(),
+        "diamante".to_string(),
+        "radio".to_string(),
+        "twenties".to_string(),
+        "rosetint".to_string(),
+        "mauve".to_string(),
+        "bluechrome".to_string(),
+        "vintage".to_string(),
+        "perfume".to_string(),
+        "serenity".to_string(),
+    ])
+}
+
+#[tauri::command]
+async fn get_supported_effects() -> Result<Vec<String>, String> {
+    Ok(vec![
+        "solarize".to_string(),
+        "invert".to_string(),
+        "grayscale".to_string(),
+        "sepia".to_string(),
+    ])
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ImageOperation {
+    pub operation_type: String, // "resize", "filter", "effect", "adjust"
+    // Resize options
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    // Filter options
+    pub filter_name: Option<String>,
+    // Effect options
+    pub effect_name: Option<String>,
+    // Adjustment options
+    pub brightness: Option<i32>, // -100 to 100
+    pub contrast: Option<i32>,   // -100 to 100
+    pub saturation: Option<i32>, // -100 to 100
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TextureOperation {
+    pub id: String,
+    pub operation_type: String, // "copy", "delete", "rename"
+    pub source_path: Option<String>,
+    pub destination_path: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TextureOperationResult {
+    pub operation_id: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProcessedImageMetadata {
+    pub width: u32,
+    pub height: u32,
+    pub format: String,
+    pub size_bytes: u64,
+    pub base64_data: String,
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -413,7 +880,14 @@ pub fn run() {
             copy_file,
             write_file,
             read_file,
-            write_log_file
+            write_log_file,
+            read_image_as_base64,
+            get_image_metadata,
+            save_texture_to_file,
+            batch_process_textures,
+            process_image,
+            get_supported_filters,
+            get_supported_effects
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -10,15 +10,12 @@ import { type SidebarContext, UnifiedSidebar } from "./unified-sidebar";
 export function RengineEditor() {
   const [rightSidebarContext, setRightSidebarContext] =
     useState<SidebarContext>("tools");
-  // Auto-save initial scene on first mount
   useEffect(() => {
     const autoSaveInitialScene = async () => {
       try {
         const sceneState = useSceneStore.getState();
 
-        // Only auto-save if this is a fresh scene without a file path
         if (!sceneState.currentFilePath) {
-          // Try primary directory first
           let autoSaveDir: string;
           try {
             const home = await homeDir();
@@ -35,7 +32,6 @@ export function RengineEditor() {
               error
             );
 
-            // Fallback to documents directory
             try {
               const documents = await documentDir();
               autoSaveDir = await join(documents, "Rengine", "Projects");
@@ -109,17 +105,57 @@ export function RengineEditor() {
       />
 
       {/* Main Editor Area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - Scene Hierarchy */}
-        <UnifiedSidebar context="scene" />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Sidebar - Scene Hierarchy */}
+          <UnifiedSidebar context="scene" />
 
-        {/* 3D Canvas - Main Viewport */}
-        <div className="relative flex-1">
-          <SceneCanvas />
+          {/* 3D Canvas - Main Viewport */}
+          <div className="relative flex-1">
+            <SceneCanvas />
+          </div>
+
+          {/* Right Sidebar - Properties/Tools */}
+          <UnifiedSidebar context={rightSidebarContext} />
         </div>
 
-        {/* Right Sidebar - Properties/Tools */}
-        <UnifiedSidebar context={rightSidebarContext} />
+        {/* Status Bar */}
+        <div className="flex h-12 items-center justify-between border-t bg-background px-4 py-2">
+          {/* Left Side - Basic Info */}
+          <div className="flex items-center gap-4">
+            {/* Basic Scene Info */}
+            <div className="flex items-center gap-3 text-muted-foreground text-xs">
+              <div className="flex items-center gap-1">
+                <span>Objects:</span>
+                <span className="font-medium font-mono">
+                  {useSceneStore.getState().objects.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span>Lights:</span>
+                <span className="font-medium font-mono">
+                  {useSceneStore.getState().lights.length}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Additional Info */}
+          <div className="flex items-center gap-3 text-muted-foreground text-xs">
+            <div className="flex items-center gap-1">
+              <span>Mode:</span>
+              <span className="font-medium">Editor</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span>Scene:</span>
+              <span className="font-medium">
+                {useSceneStore.getState().currentFilePath?.split("/").pop() ||
+                  "Untitled"}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

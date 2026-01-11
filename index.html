@@ -6,19 +6,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta
       name="description"
-      content="rengine - A modern, fast, and powerful file manager for Windows, macOS, and Linux with declarative filesystem management"
+      content="rengine - A modern, fast, and powerful game engine for Windows, macOS, and Linux with advanced 3D rendering capabilities"
     >
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="rengine Metaverse">
+    <meta name="apple-mobile-web-app-title" content="rengine Game Engine">
     <link rel="apple-touch-icon" href="/logo192.png">
     <link rel="manifest" href="/manifest.json">
-    <title>rengine - Modern File Manager</title>
+
+    <!-- Performance optimizations -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Preload critical resources -->
+    <link rel="modulepreload" href="/src/main.tsx">
+    <link rel="modulepreload" href="/src/router.tsx">
+
+    <title>rengine - Modern Game Engine</title>
     <script>
     "use strict";
-    // Apply theme immediately to prevent flash of wrong theme
+    // Performance optimizations and theme application
     (() => {
+      // Apply theme immediately to prevent flash of wrong theme
       const storageKey = "rengine-ui-theme";
       const stored = localStorage.getItem(storageKey);
       const theme =
@@ -35,6 +45,20 @@
         root.classList.add(systemTheme);
       } else {
         root.classList.add(theme);
+      }
+
+      // Performance hints for browser
+      if ("serviceWorker" in navigator) {
+        // Service worker for caching (if implemented later)
+        // navigator.serviceWorker.register('/sw.js');
+      }
+
+      // Disable smooth scrolling for better performance
+      document.documentElement.style.scrollBehavior = "auto";
+
+      // Preload critical fonts
+      if ("fonts" in document) {
+        document.fonts.load("1em Inter");
       }
     })();
     </script>

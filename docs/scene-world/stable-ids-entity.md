@@ -162,25 +162,52 @@ const prefab = {
 Rengine maintains a global entity registry:
 
 ```typescript
-class EntityRegistry {
-  private entities = new Map<string, Entity>();
-  private idCounter = new Map<string, number>();
+function createEntityRegistry() {
+  const entities = new Map<string, Entity>();
+  const idCounter = new Map<string, number>();
 
-  register(entity: Entity): void {
-    this.entities.set(entity.id, entity);
-  }
+  const register = (entity: Entity): void => {
+    entities.set(entity.id, entity);
+  };
 
-  getById(id: string): Entity | undefined {
-    return this.entities.get(id);
-  }
+  const getById = (id: string): Entity | undefined => {
+    return entities.get(id);
+  };
 
-  generateId(type: string): string {
-    const count = this.idCounter.get(type) || 0;
+  const generateId = (type: string): string => {
+    const count = idCounter.get(type) || 0;
     const timestamp = Date.now();
     const suffix = count.toString(36).padStart(4, '0');
-    this.idCounter.set(type, count + 1);
+    idCounter.set(type, count + 1);
     return `${type}_${timestamp}_${suffix}`;
-  }
+  };
+
+  const unregister = (id: string): void => {
+    entities.delete(id);
+  };
+
+  const clear = (): void => {
+    entities.clear();
+    idCounter.clear();
+  };
+
+  const getAllEntities = (): Entity[] => {
+    return Array.from(entities.values());
+  };
+
+  const getEntitiesByType = (type: string): Entity[] => {
+    return Array.from(entities.values()).filter(entity => entity.id.startsWith(`${type}_`));
+  };
+
+  return {
+    register,
+    unregister,
+    getById,
+    generateId,
+    clear,
+    getAllEntities,
+    getEntitiesByType
+  };
 }
 ```
 

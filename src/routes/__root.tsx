@@ -10,23 +10,17 @@ import { ToasterProvider } from "~/components/toaster";
 // import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 // import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 
-interface MyRouterContext extends Record<string, never> {
-  // Context is empty since we're not using TanStack Query
-}
+interface MyRouterContext extends Record<string, never> {}
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   component: RootComponent,
   context: () => ({}),
 });
 
-// Simplified component for Tauri/Vite setup (no SSR)
 function RootComponent() {
   const location = useLocation();
-  // Only show devtools in development to prevent performance issues
-  // const isDevelopment = import.meta.env.DEV;
 
-  // Hide sidebar for specific routes (RengineEditor handles its own layout)
-  const hideSidebarRoutes = ["/", "/editor", "/settings", "/auth", "/account"];
+  const hideSidebarRoutes = ["/", "/editor", "/auth", "/account"];
   const showSidebar = !hideSidebarRoutes.includes(location.pathname);
 
   return (
