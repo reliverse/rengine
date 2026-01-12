@@ -6,7 +6,9 @@ export interface LightingPreset {
   lights: Omit<SceneLight, "id" | "name">[];
 }
 
-export const LIGHTING_PRESETS: Record<string, LightingPreset> = {
+export type LightingPresetId = keyof typeof LIGHTING_PRESETS;
+
+export const LIGHTING_PRESETS = {
   default: {
     name: "Default",
     description: "Basic ambient and directional lighting",
@@ -38,21 +40,22 @@ export const LIGHTING_PRESETS: Record<string, LightingPreset> = {
 
   studio: {
     name: "Studio",
-    description: "Soft, even lighting for product photography",
+    description:
+      "Professional studio lighting setup for 3D modeling and content creation",
     lights: [
       {
         type: "ambient",
-        color: "#f0f0f0",
-        intensity: 0.4,
+        color: "#e8e8e8",
+        intensity: 0.3,
         position: [0, 0, 0],
         visible: true,
         castShadow: false,
       },
       {
         type: "directional",
-        color: "#ffffff",
-        intensity: 0.8,
-        position: [5, 8, 5],
+        color: "#fdfbf7", // Warm white key light
+        intensity: 1.2,
+        position: [8, 12, 8],
         target: [0, 0, 0],
         visible: true,
         castShadow: true,
@@ -60,31 +63,40 @@ export const LIGHTING_PRESETS: Record<string, LightingPreset> = {
         shadowMapSize: 2048,
         shadowNear: 0.1,
         shadowFar: 50,
-        shadowRadius: 4,
+        shadowRadius: 6,
       },
       {
         type: "directional",
-        color: "#e0e0ff",
-        intensity: 0.3,
-        position: [-5, 3, 5],
+        color: "#f0f8ff", // Cool blue fill light
+        intensity: 0.4,
+        position: [-6, 8, 6],
+        target: [0, 0, 0],
+        visible: true,
+        castShadow: false,
+      },
+      {
+        type: "directional",
+        color: "#fff8e7", // Warm rim light
+        intensity: 0.6,
+        position: [0, 4, -10],
         target: [0, 0, 0],
         visible: true,
         castShadow: false,
       },
       {
         type: "point",
-        color: "#fff0e0",
-        intensity: 0.5,
-        position: [3, 2, 3],
+        color: "#fefefe", // Neutral accent light
+        intensity: 0.8,
+        position: [4, 6, 4],
         visible: true,
         castShadow: true,
-        distance: 20,
+        distance: 25,
         decay: 2,
         shadowBias: 0.0001,
         shadowMapSize: 1024,
         shadowNear: 0.1,
-        shadowFar: 20,
-        shadowRadius: 2,
+        shadowFar: 25,
+        shadowRadius: 3,
       },
     ],
   },
@@ -336,28 +348,34 @@ export const LIGHTING_PRESETS: Record<string, LightingPreset> = {
       },
     ],
   },
-};
+} as const;
 
-export function applyLightingPreset(presetId: string): SceneLight[] {
+export function applyLightingPreset(presetId: LightingPresetId): SceneLight[] {
   const preset = LIGHTING_PRESETS[presetId];
   if (!preset) {
     throw new Error(`Lighting preset "${presetId}" not found`);
   }
 
-  return preset.lights.map((light, index) => ({
-    ...light,
-    id: `light_preset_${presetId}_${index}_${Date.now()}`,
-    name: `${preset.name} Light ${index + 1}`,
-  }));
+  return preset.lights.map((light, index) => {
+    const lightWithTarget = light as any;
+    const { target, ...restLight } = lightWithTarget;
+    return {
+      ...restLight,
+      id: `light_preset_${presetId}_${index}_${Date.now()}`,
+      name: `${preset.name} Light ${index + 1}`,
+      position: [...light.position] as [number, number, number],
+      ...(target ? { target: [...target] as [number, number, number] } : {}),
+    };
+  });
 }
 
 export function getPresetList(): Array<{
-  id: string;
+  id: LightingPresetId;
   name: string;
   description: string;
 }> {
   return Object.entries(LIGHTING_PRESETS).map(([id, preset]) => ({
-    id,
+    id: id as LightingPresetId,
     name: preset.name,
     description: preset.description,
   }));

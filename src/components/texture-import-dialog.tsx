@@ -32,6 +32,7 @@ interface TextureImportDialogProps {
 
 interface ImportFile {
   file: File;
+  path?: string; // Tauri path for native files
   status: "pending" | "processing" | "success" | "error";
   error?: string;
   textureId?: string;
@@ -197,11 +198,11 @@ export function TextureImportDialog({ children }: TextureImportDialogProps) {
 
   const handleClose = useCallback(() => {
     // Clean up object URLs
-    files.forEach((f) => {
+    for (const f of files) {
       if (f.preview) {
         URL.revokeObjectURL(f.preview);
       }
-    });
+    }
     setFiles([]);
     setImportProgress(0);
     setOpen(false);
@@ -242,7 +243,7 @@ export function TextureImportDialog({ children }: TextureImportDialogProps) {
 
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogTrigger>{children}</DialogTrigger>
       <DialogContent className="flex max-h-[80vh] max-w-4xl flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -337,7 +338,7 @@ export function TextureImportDialog({ children }: TextureImportDialogProps) {
                 {files.map((fileData, index) => (
                   <div
                     className="flex items-center gap-3 rounded-lg border bg-card p-3"
-                    key={index}
+                    key={`${fileData.file.name}-${fileData.file.lastModified}-${index}`}
                   >
                     {/* Preview */}
                     <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded border bg-muted">
@@ -345,7 +346,9 @@ export function TextureImportDialog({ children }: TextureImportDialogProps) {
                         <img
                           alt={fileData.file.name}
                           className="h-full w-full object-cover"
+                          height={48}
                           src={fileData.preview}
+                          width={48}
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center">

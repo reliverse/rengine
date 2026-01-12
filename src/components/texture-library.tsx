@@ -71,7 +71,6 @@ export function TextureLibrary({
     filterSearch,
     sortBy,
     sortOrder,
-    previewSize,
     showThumbnails,
     setLibraryVisible,
     setFilterType,
@@ -155,7 +154,9 @@ export function TextureLibrary({
   );
 
   const handleBulkDelete = useCallback(() => {
-    selectedTextures.forEach((id) => removeTexture(id));
+    for (const id of selectedTextures) {
+      removeTexture(id);
+    }
     setSelectedTextures(new Set());
   }, [selectedTextures, removeTexture]);
 
@@ -171,15 +172,7 @@ export function TextureLibrary({
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Number.parseFloat((bytes / k ** i).toFixed(2)) + " " + sizes[i];
-  };
-
-  const formatDate = (date: Date) => {
-    return (
-      date.toLocaleDateString() +
-      " " +
-      date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    );
+    return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
   };
 
   if (!libraryVisible) {
@@ -306,10 +299,16 @@ export function TextureLibrary({
           </div>
 
           {/* Export */}
-          <Select onValueChange={handleBulkExport}>
+          <Select
+            onValueChange={(value) =>
+              handleBulkExport(value as "png" | "jpg" | "webp")
+            }
+          >
             <SelectTrigger className="w-24">
-              <Download className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Export" />
+              <div className="flex items-center">
+                <Download className="mr-2 h-4 w-4" />
+                <span>Export</span>
+              </div>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="png">PNG</SelectItem>
@@ -357,7 +356,6 @@ export function TextureLibrary({
                 key={texture.id}
                 onClick={(e) => handleTextureClick(texture.id, e)}
                 onDelete={() => removeTexture(texture.id)}
-                previewSize={previewSize}
                 showThumbnail={showThumbnails}
                 texture={texture}
               />
@@ -397,7 +395,7 @@ export function TextureLibrary({
 interface TextureCardProps {
   texture: any;
   isSelected: boolean;
-  previewSize: number;
+  previewSize?: number;
   showThumbnail: boolean;
   onClick: (e: React.MouseEvent) => void;
   onDelete: () => void;
@@ -406,23 +404,40 @@ interface TextureCardProps {
 function TextureCard({
   texture,
   isSelected,
-  previewSize,
+  previewSize: _previewSize,
   showThumbnail,
   onClick,
   onDelete,
 }: TextureCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
+  };
+
   return (
     <div
+      aria-label={`Texture: ${texture.name}`}
       className={cn(
         "group relative cursor-pointer rounded-lg border-2 transition-all hover:shadow-md",
         isSelected ? "border-primary shadow-md" : "border-border",
         "aspect-square overflow-hidden"
       )}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick(e as any);
+        }
+      }}
       onMouseEnter={() => setShowDetails(true)}
       onMouseLeave={() => setShowDetails(false)}
+      role="button"
+      tabIndex={0}
     >
       {/* Thumbnail */}
       <div className="flex h-full w-full items-center justify-center bg-muted">
@@ -430,8 +445,10 @@ function TextureCard({
           <img
             alt={texture.name}
             className="h-full w-full object-cover"
+            height={256}
             src={texture.thumbnail}
             style={{ imageRendering: "pixelated" }}
+            width={256}
           />
         ) : (
           <div className="flex flex-col items-center justify-center text-muted-foreground">
@@ -445,7 +462,8 @@ function TextureCard({
       <div
         className={cn(
           "absolute top-1 left-1 h-3 w-3 rounded-full",
-          TextureTypeColors[texture.type] || "bg-slate-500"
+          TextureTypeColors[texture.type as keyof typeof TextureTypeColors] ||
+            "bg-slate-500"
         )}
       />
 
@@ -462,7 +480,11 @@ function TextureCard({
           <div>
             <div className="truncate font-medium">{texture.name}</div>
             <div className="text-muted-foreground">
-              {TextureTypeLabels[texture.type]}
+              {
+                TextureTypeLabels[
+                  texture.type as keyof typeof TextureTypeLabels
+                ]
+              }
             </div>
           </div>
 

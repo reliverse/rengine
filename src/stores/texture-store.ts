@@ -2,7 +2,16 @@ import * as THREE from "three";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import {
+  getImageMetadata,
+  isTauri,
+  readImageAsBase64,
+  saveTextureToFile,
+  showTextureFileDialog,
+  showTextureSaveDialog,
+} from "~/utils/tauri-texture-api";
+import {
   applyTextureChannelProperties,
+  applyTextureOptions,
   clearTextureCache,
   createCheckerboardTexture,
   createColorTexture,
@@ -16,6 +25,10 @@ import {
   validateTexture,
 } from "~/utils/texture-manager";
 import { textureOptimizer } from "~/utils/texture-optimizer";
+
+// Regex constants for performance
+const EXTENSION_REGEX = /\.[^/.]+$/;
+const PATH_SEPARATOR_REGEX = /[/\\]/;
 
 export type TextureType =
   | "albedo" // Base color/diffuse
@@ -251,14 +264,13 @@ export const useTextureStore = create<
         const updatedTexture: TextureAsset = {
           ...texture,
           ...updates,
-          metadata: { ...texture.metadata, ...updates.metadata },
-          settings: { ...texture.settings, ...updates.settings },
-          usage: { ...texture.usage, ...updates.usage },
           metadata: {
             ...texture.metadata,
             ...updates.metadata,
             modifiedAt: new Date(),
           },
+          settings: { ...texture.settings, ...updates.settings },
+          usage: { ...texture.usage, ...updates.usage },
         };
 
         return {
@@ -327,14 +339,14 @@ export const useTextureStore = create<
         });
 
         const textureAsset: Omit<TextureAsset, "id"> = {
-          name: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
+          name: file.name.replace(EXTENSION_REGEX, ""), // Remove extension
           type,
           texture,
           metadata: {
             ...createDefaultTextureMetadata("file"),
             width: (texture.image as any)?.width || 0,
             height: (texture.image as any)?.height || 0,
-            format: texture.format,
+            format: texture.format as THREE.PixelFormat,
             encoding: (texture as any).colorSpace || THREE.SRGBColorSpace,
             sizeBytes: file.size,
             originalFilename: file.name,
@@ -368,7 +380,7 @@ export const useTextureStore = create<
             ...createDefaultTextureMetadata("file"),
             width: (texture.image as any)?.width || 0,
             height: (texture.image as any)?.height || 0,
-            format: texture.format,
+            format: texture.format as THREE.PixelFormat,
             encoding: (texture as any).colorSpace || THREE.SRGBColorSpace,
             sizeBytes: 0, // Unknown for URL textures
           },
@@ -424,7 +436,7 @@ export const useTextureStore = create<
           ...createDefaultTextureMetadata("procedural"),
           width: options.size,
           height: options.size,
-          format: texture.format,
+          format: texture.format as THREE.PixelFormat,
           encoding: (texture as any).colorSpace || THREE.SRGBColorSpace,
           sizeBytes: options.size * options.size * 4, // Rough estimate
         },
@@ -460,7 +472,7 @@ export const useTextureStore = create<
     },
 
     setSortOrder: (order) => {
-      set({ sortOrder });
+      set({ sortOrder: order });
     },
 
     // Import/Export
@@ -500,9 +512,9 @@ export const useTextureStore = create<
             const textureAsset: Omit<TextureAsset, "id"> = {
               name:
                 filePath
-                  .split(/[/\\]/)
+                  .split(PATH_SEPARATOR_REGEX)
                   .pop()
-                  ?.replace(/\.[^/.]+$/, "") || "texture",
+                  ?.replace(EXTENSION_REGEX, "") || "texture",
               type,
               path: filePath,
               texture,
@@ -518,7 +530,7 @@ export const useTextureStore = create<
                       : THREE.RGBAFormat,
                 encoding: THREE.SRGBColorSpace,
                 sizeBytes: metadata.sizeBytes,
-                originalFilename: filePath.split(/[/\\]/).pop(),
+                originalFilename: filePath.split(PATH_SEPARATOR_REGEX).pop(),
               },
               settings: createDefaultTextureSettings(),
               usage: createDefaultTextureUsage(),
@@ -685,6 +697,7 @@ export const useTextureStore = create<
           generateMipmaps: texture.texture.generateMipmaps,
         },
       });
+      await Promise.resolve();
     },
 
     // Usage tracking

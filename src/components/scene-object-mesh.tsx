@@ -1,6 +1,6 @@
 import { TransformControls } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { type Color, Mesh, MeshStandardMaterial } from "three";
 import { useMaterialStore } from "~/stores/material-store";
@@ -23,12 +23,12 @@ export const SceneObjectMesh = memo(function SceneObjectMesh({
   object: SceneObject;
 }) {
   const meshRef = useRef<Mesh>(null);
-  const transformControlsRef =
-    useRef<React.ComponentRef<typeof TransformControls>>(null);
+  const [targetObject, setTargetObject] = useState<THREE.Object3D | null>(null);
 
   // Use selectors to prevent unnecessary re-renders
   const selectedObjectIds = useSceneStore((state) => state.selectedObjectIds);
   const activeTool = useSceneStore((state) => state.activeTool);
+  const transformDragging = useSceneStore((state) => state.transformDragging);
   const { selectObject, updateObject, setTransformDragging } = useSceneStore();
 
   const isSelected = selectedObjectIds.includes(object.id);
@@ -45,13 +45,29 @@ export const SceneObjectMesh = memo(function SceneObjectMesh({
   );
 
   const handleObjectChange = useCallback(() => {
-    if (!(transformControlsRef.current && meshRef.current)) {
+    // Get the actual object being controlled (TransformControls manipulates this directly)
+    const targetObj =
+      object.type === "imported" && object.importedModel
+        ? object.importedModel
+        : meshRef.current;
+
+    if (!targetObj) {
       return;
     }
 
-    const positionArray = meshRef.current.position.toArray();
-    const rotationArray = meshRef.current.rotation.toArray();
-    const scaleArray = meshRef.current.scale.toArray();
+    const positionArray = targetObj.position.toArray();
+    const rotationArray = targetObj.rotation.toArray();
+    const scaleArray = targetObj.scale.toArray();
+
+    // For imported models, account for initial scale
+    const finalScale: [number, number, number] =
+      object.type === "imported" && object.initialScale
+        ? [
+            scaleArray[0] / object.initialScale,
+            scaleArray[1] / object.initialScale,
+            scaleArray[2] / object.initialScale,
+          ]
+        : [scaleArray[0], scaleArray[1], scaleArray[2]];
 
     updateObject(object.id, {
       position: [positionArray[0], positionArray[1], positionArray[2]],
@@ -60,9 +76,15 @@ export const SceneObjectMesh = memo(function SceneObjectMesh({
         (rotationArray[1] * 180) / Math.PI,
         (rotationArray[2] * 180) / Math.PI,
       ],
-      scale: [scaleArray[0], scaleArray[1], scaleArray[2]],
+      scale: finalScale,
     });
-  }, [object.id, updateObject]);
+  }, [
+    object.id,
+    object.type,
+    object.initialScale,
+    object.importedModel,
+    updateObject,
+  ]);
 
   // Memoize transform mode
   const transformMode = useMemo(() => {
@@ -79,7 +101,31 @@ export const SceneObjectMesh = memo(function SceneObjectMesh({
   }, [activeTool]);
 
   // Optimize useFrame - only run when necessary properties change
+  // Skip transform updates when dragging to allow TransformControls to work
   useFrame(() => {
+    // Don't update transforms while dragging - let TransformControls handle it
+    if (transformDragging && isSelected) {
+      // Only update visibility and materials during drag
+      if (object.type === "imported" && object.importedModel) {
+        object.importedModel.visible = object.visible;
+        if (isSelected !== object.importedModel.userData.lastSelected) {
+          object.importedModel.userData.lastSelected = isSelected;
+          object.importedModel.traverse((child) => {
+            if (
+              child instanceof Mesh &&
+              child.material instanceof MeshStandardMaterial
+            ) {
+              (child.material.emissive as Color).setHex(
+                isSelected ? 0x44_44_44 : 0x00_00_00
+              );
+              child.material.needsUpdate = true;
+            }
+          });
+        }
+      }
+      return;
+    }
+
     if (object.type === "imported" && object.importedModel) {
       // Batch position, rotation, scale updates
       object.importedModel.position.set(...object.position);
@@ -195,8 +241,10 @@ export const SceneObjectMesh = memo(function SceneObjectMesh({
       color: new THREE.Color(object.color),
       roughness: 0.5,
       metalness: 0.0,
+      // Make planes double-sided so they're visible from both sides
+      side: object.type === "plane" ? THREE.DoubleSide : THREE.FrontSide,
     });
-  }, [object.materialId, object.material, object.color]);
+  }, [object.materialId, object.material, object.color, object.type]);
 
   // Update material properties
   useEffect(() => {
@@ -227,19 +275,48 @@ export const SceneObjectMesh = memo(function SceneObjectMesh({
     };
   }, [object.type, geometryType, geometryArgs]);
 
+  // Update target object when mesh ref or imported model changes
+  useEffect(() => {
+    if (object.type === "imported" && object.importedModel) {
+      setTargetObject(object.importedModel);
+    }
+    // For regular objects, the ref callback will handle setting targetObject
+  }, [object.type, object.importedModel]);
+
+  // Update target object when mesh ref becomes available (using ref callback)
+  const handleMeshRef = useCallback(
+    (node: Mesh | null) => {
+      if (node && object.type !== "imported") {
+        setTargetObject(node);
+      } else if (!node && object.type !== "imported") {
+        setTargetObject(null);
+      }
+    },
+    [object.type]
+  );
+
+  // Get the current target object (check ref directly for non-imported objects)
+  const currentTargetObject = useMemo(() => {
+    if (object.type === "imported" && object.importedModel) {
+      return object.importedModel;
+    }
+    // For regular objects, use the ref directly if state hasn't updated yet
+    return targetObject || meshRef.current;
+  }, [object.type, object.importedModel, targetObject]);
+
   // Memoize transform controls to prevent unnecessary re-mounting
   const transformControls = useMemo(() => {
-    if (!isSelected || activeTool === "select") return null;
+    if (!isSelected || activeTool === "select" || !currentTargetObject)
+      return null;
 
     return (
       <TransformControls
         key={`transform-${object.id}`}
         mode={transformMode}
-        object={meshRef.current || undefined}
+        object={currentTargetObject}
         onMouseDown={() => setTransformDragging(true)}
         onMouseUp={() => setTransformDragging(false)}
         onObjectChange={handleObjectChange}
-        ref={transformControlsRef}
         showX
         showY
         showZ
@@ -253,6 +330,7 @@ export const SceneObjectMesh = memo(function SceneObjectMesh({
     handleObjectChange,
     setTransformDragging,
     object.id,
+    currentTargetObject,
   ]);
 
   return (
@@ -271,7 +349,10 @@ export const SceneObjectMesh = memo(function SceneObjectMesh({
           material={material}
           onPointerDown={handlePointerDown}
           receiveShadow
-          ref={meshRef}
+          ref={(node) => {
+            meshRef.current = node;
+            handleMeshRef(node);
+          }}
         />
       )}
     </>

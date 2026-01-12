@@ -1,7 +1,8 @@
 import { save } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -21,8 +22,9 @@ import {
 import { useToast } from "~/hooks/use-toast";
 import { useSceneStore } from "~/stores/scene-store";
 import { usePrecision } from "~/stores/settings-store";
+import { exportSceneToGLTF } from "~/utils/gltf-export";
 
-type ExportFormat = "samp";
+type ExportFormat = "samp" | "gltf" | "glb";
 
 interface ExportDialogProps {
   open: boolean;
@@ -30,10 +32,13 @@ interface ExportDialogProps {
 }
 
 export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("samp");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("glb");
   const [isExporting, setIsExporting] = useState(false);
+  const [includeLights, setIncludeLights] = useState(true);
+  const [embedTextures, setEmbedTextures] = useState(true);
   const { toast } = useToast();
   const objects = useSceneStore((state) => state.objects);
+  const lights = useSceneStore((state) => state.lights);
   const precision = usePrecision();
 
   const generateSampCode = () => {
@@ -58,36 +63,44 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      let content = "";
       let fileName = "";
+      let filePath: string | null = null;
 
       switch (exportFormat) {
-        case "samp":
-          content = generateSampCode();
+        case "samp": {
+          const content = generateSampCode();
+          if (!content) {
+            toast({
+              title: "Export failed",
+              description: "No content to export",
+              variant: "destructive",
+              duration: 4000,
+            });
+            return;
+          }
           fileName = "scene_objects.pwn";
           break;
+        }
+
+        case "gltf":
+        case "glb":
+          fileName = `scene.${exportFormat}`;
+          break;
+
         default:
           throw new Error(`Unsupported export format: ${exportFormat}`);
       }
 
-      if (!content) {
-        toast({
-          title: "Export failed",
-          description: "No content to export",
-          variant: "destructive",
-          duration: 4000,
-        });
-        return;
-      }
-
       // Show save dialog
-      const filePath = await save({
-        filters: [
-          {
-            name: "Pawn Script",
-            extensions: ["pwn"],
-          },
-        ],
+      const filters =
+        exportFormat === "samp"
+          ? [{ name: "Pawn Script", extensions: ["pwn"] }]
+          : exportFormat === "gltf"
+            ? [{ name: "GLTF", extensions: ["gltf"] }]
+            : [{ name: "GLB", extensions: ["glb"] }];
+
+      filePath = await save({
+        filters,
         defaultPath: fileName,
       });
 
@@ -106,27 +119,81 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
         return;
       }
 
-      // Validate content is not empty
-      if (!content || content.trim() === "") {
-        toast({
-          title: "Export failed",
-          description: "No content to export",
-          variant: "destructive",
-          duration: 4000,
-        });
-        return;
-      }
+      if (exportFormat === "samp") {
+        const content = generateSampCode();
+        if (!content || content.trim() === "") {
+          toast({
+            title: "Export failed",
+            description: "No content to export",
+            variant: "destructive",
+            duration: 4000,
+          });
+          return;
+        }
 
-      try {
-        // Add small delay before file write to ensure dialog is fully closed
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        await writeTextFile(filePath, content);
-        console.log("File write completed successfully");
-      } catch (writeError) {
-        console.error("File write error:", writeError);
-        throw new Error(
-          `Failed to write file: ${writeError instanceof Error ? writeError.message : "Unknown error"}`
-        );
+        try {
+          // Add small delay before file write to ensure dialog is fully closed
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          await writeTextFile(filePath, content);
+          console.log("File write completed successfully");
+        } catch (writeError) {
+          console.error("File write error:", writeError);
+          throw new Error(
+            `Failed to write file: ${writeError instanceof Error ? writeError.message : "Unknown error"}`
+          );
+        }
+      } else {
+        // GLTF/GLB export
+        const result = await exportSceneToGLTF(objects, lights, {
+          binary: exportFormat === "glb",
+          includeLights,
+          includeCameras: false, // TODO: Implement camera export
+          embedTextures,
+          truncateDrawRange: true,
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || "Export failed");
+        }
+
+        if (!result.data) {
+          throw new Error("No export data generated");
+        }
+
+        try {
+          // Add small delay before file write to ensure dialog is fully closed
+          await new Promise((resolve) => setTimeout(resolve, 50));
+
+          if (exportFormat === "glb" && result.data instanceof ArrayBuffer) {
+            await writeFile(filePath, new Uint8Array(result.data));
+          } else if (
+            exportFormat === "gltf" &&
+            typeof result.data === "string"
+          ) {
+            await writeTextFile(filePath, result.data);
+          } else {
+            throw new Error("Invalid export data format");
+          }
+
+          console.log("GLTF/GLB export completed successfully");
+        } catch (writeError) {
+          console.error("File write error:", writeError);
+          throw new Error(
+            `Failed to write file: ${writeError instanceof Error ? writeError.message : "Unknown error"}`
+          );
+        }
+
+        // Show warnings if any
+        if (result.warnings && result.warnings.length > 0) {
+          setTimeout(() => {
+            toast({
+              title: "Export warnings",
+              description: result.warnings?.join("\n"),
+              variant: "default",
+              duration: 5000,
+            });
+          }, 1000);
+        }
       }
 
       // Show success message
@@ -186,24 +253,65 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="glb">GLB (Binary)</SelectItem>
+                <SelectItem value="gltf">GLTF (JSON)</SelectItem>
                 <SelectItem value="samp">SAMP (Pawn)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="text-muted-foreground text-sm">
-            {objectsWithModelIdCount > 0 ? (
-              <span>
-                Ready to export {objectsWithModelIdCount} object
-                {objectsWithModelIdCount !== 1 ? "s" : ""} with model IDs.
-              </span>
-            ) : (
-              <span>
-                No objects with model IDs found. Add model IDs to objects before
-                exporting.
-              </span>
-            )}
-          </div>
+          {exportFormat === "glb" || exportFormat === "gltf" ? (
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  checked={includeLights}
+                  id="includeLights"
+                  onCheckedChange={(checked) =>
+                    setIncludeLights(checked as boolean)
+                  }
+                />
+                <Label className="text-sm" htmlFor="includeLights">
+                  Include lights ({lights.length} lights)
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  checked={embedTextures}
+                  id="embedTextures"
+                  onCheckedChange={(checked) =>
+                    setEmbedTextures(checked as boolean)
+                  }
+                />
+                <Label className="text-sm" htmlFor="embedTextures">
+                  Embed textures in file
+                </Label>
+              </div>
+
+              <div className="text-muted-foreground text-sm">
+                Ready to export {objects.length} object
+                {objects.length !== 1 ? "s" : ""}
+                {includeLights
+                  ? ` and ${lights.length} light${lights.length !== 1 ? "s" : ""}`
+                  : ""}
+                .
+              </div>
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-sm">
+              {objectsWithModelIdCount > 0 ? (
+                <span>
+                  Ready to export {objectsWithModelIdCount} object
+                  {objectsWithModelIdCount !== 1 ? "s" : ""} with model IDs.
+                </span>
+              ) : (
+                <span>
+                  No objects with model IDs found. Add model IDs to objects
+                  before exporting.
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -211,7 +319,12 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
             Cancel
           </Button>
           <Button
-            disabled={isExporting || objectsWithModelIdCount === 0}
+            disabled={
+              isExporting ||
+              (exportFormat === "samp" && objectsWithModelIdCount === 0) ||
+              ((exportFormat === "gltf" || exportFormat === "glb") &&
+                objects.length === 0)
+            }
             onClick={handleExport}
           >
             {isExporting ? "Exporting..." : "Export"}

@@ -1,8 +1,9 @@
 import { ErrorBoundary } from "~/components/error-boundary";
+import { StatusBar } from "~/components/status-bar";
 import {
   type SidebarContext,
-  UnifiedSidebar,
-} from "~/components/unified-sidebar";
+  RightSidebar,
+} from "~/components/right-sidebar";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -19,10 +20,12 @@ export function MainLayout({
     <ErrorBoundary>
       <div className="flex h-screen flex-col">
         <div className="flex flex-1 overflow-hidden">
-          {showSidebar && <UnifiedSidebar context={sidebarContext} />}
+          {showSidebar && <RightSidebar context={sidebarContext} />}
 
           <div className="flex-1 overflow-hidden">{children}</div>
         </div>
+
+        <StatusBar />
       </div>
     </ErrorBoundary>
   );

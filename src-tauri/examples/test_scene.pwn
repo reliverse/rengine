@@ -1,0 +1,4 @@
+// Test PWN file for import functionality
+CreateDynamicObject(1337, Float:10.5, Float:20.3, Float:5.0, Float:0.0, Float:0.0, Float:90.0, worldid = -1, interiorid = -1, playerid = -1, Float:streamdistance = STREAMER_OBJECT_SD, Float:drawdistance = STREAMER_OBJECT_DD, areaid = -1, priority = 0);
+CreateDynamicObject(1500, Float:-5.2, Float:15.7, Float:2.5, Float:45.0, Float:30.0, Float:0.0, worldid = 5, interiorid = 2, playerid = -1, Float:streamdistance = 150.0, Float:drawdistance = 0.0, areaid = 10, priority = 1);
+CreateDynamicObject(1234, Float:0.0, Float:0.0, Float:10.0, Float:0.0, Float:0.0, Float:0.0);

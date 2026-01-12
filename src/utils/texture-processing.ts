@@ -25,7 +25,7 @@ export interface TextureProcessingOptions {
 /**
  * Convert texture to different format
  */
-export async function convertTextureFormat(
+export function convertTextureFormat(
   texture: THREE.Texture,
   targetFormat: "png" | "jpg" | "webp" | "tga" | "dds",
   options: TextureProcessingOptions = {}
@@ -356,7 +356,10 @@ function applySharpen(
   const blurredCanvas = document.createElement("canvas");
   blurredCanvas.width = canvas.width;
   blurredCanvas.height = canvas.height;
-  const blurredCtx = blurredCanvas.getContext("2d")!;
+  const blurredCtx = blurredCanvas.getContext("2d");
+  if (!blurredCtx) {
+    throw new Error("Unable to get 2d context for blurred canvas");
+  }
   blurredCtx.drawImage(canvas, 0, 0);
   applyBlur(blurredCtx, blurredCanvas, 2);
 
@@ -504,16 +507,16 @@ export function generateMipmaps(texture: THREE.Texture): THREE.Texture[] {
 /**
  * Compress texture using various algorithms
  */
-export async function compressTexture(
-  texture: THREE.Texture,
-  format: "astc" | "dxt" | "etc" | "pvrtc",
-  quality: "low" | "medium" | "high" = "medium"
-): Promise<THREE.CompressedTexture | null> {
+export function compressTexture(
+  _texture: THREE.Texture,
+  _format: "astc" | "dxt" | "etc" | "pvrtc",
+  _quality: "low" | "medium" | "high" = "medium"
+): THREE.CompressedTexture | null {
   // Note: Actual compression would require WebGL extensions or external libraries
   // This is a placeholder for future implementation
 
   console.warn(
-    `Texture compression (${format}) not yet implemented. Using uncompressed texture.`
+    `Texture compression (${_format}) not yet implemented. Using uncompressed texture.`
   );
 
   // For now, return null to indicate compression is not available
@@ -544,12 +547,7 @@ export function estimateTextureMemoryUsage(texture: THREE.Texture): number {
     case THREE.RGBAFormat:
       bytesPerPixel = 4;
       break;
-    case THREE.LuminanceFormat:
-      bytesPerPixel = 1;
-      break;
-    case THREE.LuminanceAlphaFormat:
-      bytesPerPixel = 2;
-      break;
+    // LuminanceFormat and LuminanceAlphaFormat were removed in newer Three.js versions
   }
 
   let totalBytes = width * height * bytesPerPixel;
@@ -566,93 +564,6 @@ export function estimateTextureMemoryUsage(texture: THREE.Texture): number {
   }
 
   return totalBytes;
-}
-
-/**
- * Process image using photon-rs (Tauri backend)
- */
-export async function processImageWithPhoton(
-  inputPath: string,
-  outputPath: string,
-  operations: ImageOperation[]
-): Promise<{
-  texture: THREE.Texture;
-  metadata: {
-    width: number;
-    height: number;
-    format: string;
-    sizeBytes: number;
-  };
-}> {
-  if (!isTauri()) {
-    throw new Error(
-      "Photon image processing is only available in Tauri builds"
-    );
-  }
-
-  try {
-    const result = await processImage(inputPath, outputPath, operations);
-
-    // Create texture from the processed base64 data
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const texture = new THREE.Texture(img);
-        applyTextureOptions(texture, {
-          generateMipmaps: true,
-          anisotropy: 1,
-        });
-        texture.needsUpdate = true;
-
-        resolve({
-          texture,
-          metadata: {
-            width: result.width,
-            height: result.height,
-            format: result.format,
-            sizeBytes: result.sizeBytes,
-          },
-        });
-      };
-      img.onerror = reject;
-      img.src = result.base64Data;
-    });
-  } catch (error) {
-    console.error("Failed to process image with photon:", error);
-    throw error;
-  }
-}
-
-/**
- * Get supported photon-rs filters
- */
-export async function getPhotonFilters(): Promise<string[]> {
-  if (!isTauri()) {
-    return [];
-  }
-
-  try {
-    return await getSupportedFilters();
-  } catch (error) {
-    console.error("Failed to get photon filters:", error);
-    return [];
-  }
-}
-
-/**
- * Get supported photon-rs effects
- */
-export async function getPhotonEffects(): Promise<string[]> {
-  if (!isTauri()) {
-    return [];
-  }
-
-  try {
-    return await getSupportedEffects();
-  } catch (error) {
-    console.error("Failed to get photon effects:", error);
-    return [];
-  }
 }
 
 /**
@@ -685,7 +596,7 @@ export function validateTextureForUse(texture: THREE.Texture): {
 
   // Check power of two for mipmaps
   if (texture.generateMipmaps) {
-    const isPowerOfTwo = (n: number) => n > 0 && (n & (n - 1)) === 0;
+    const isPowerOfTwo = (n: number) => n > 0 && Number.isInteger(Math.log2(n));
     if (!(isPowerOfTwo(width) && isPowerOfTwo(height))) {
       warnings.push(
         "Non-power-of-two dimensions with mipmaps may cause issues"

@@ -1,19 +1,48 @@
 import { documentDir, homeDir, join, tempDir } from "@tauri-apps/api/path";
 import { mkdir } from "@tauri-apps/plugin-fs";
+import { Package, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "~/lib/utils";
 import { useSceneStore } from "~/stores/scene-store";
 import { saveScene } from "~/utils/scene-persistence";
+import { ModelViewerCanvas } from "./model-viewer-canvas";
+import { PerformanceFooter } from "./performance-footer";
 import { SceneCanvas } from "./scene-canvas";
 import { Toolbar } from "./toolbar";
-import { type SidebarContext, UnifiedSidebar } from "./unified-sidebar";
+import { Button } from "./ui/button";
+import { type SidebarContext, RightSidebar } from "./right-sidebar";
+
+export type ViewportMode = "editor" | "model-viewer";
 
 export function RengineEditor() {
   const [rightSidebarContext, setRightSidebarContext] =
     useState<SidebarContext>("tools");
+  const [viewportMode, setViewportMode] = useState<ViewportMode>("editor");
+  const [showLeftSidebar, setShowLeftSidebar] = useState(false);
+  const [showRightSidebar, setShowRightSidebar] = useState(false);
   useEffect(() => {
-    const autoSaveInitialScene = async () => {
+    const initializeNewProject = async () => {
       try {
         const sceneState = useSceneStore.getState();
+
+        // Add ground plane to empty project
+        if (sceneState.objects.length === 0) {
+          console.log("Adding ground plane to new project...");
+          sceneState.addObject("plane", [0, 0, 0]);
+
+          // Update the ground plane properties for better appearance
+          const groundPlane = sceneState.objects.find(
+            (obj) => obj.name === "Plane"
+          );
+          if (groundPlane) {
+            sceneState.updateObject(groundPlane.id, {
+              name: "Ground Plane",
+              scale: [20, 1, 20], // Make it a larger ground platform
+              color: "#2a2a2a", // Darker gray color for ground
+              position: [0, -0.01, 0], // Slightly below origin to avoid z-fighting
+            });
+          }
+        }
 
         if (!sceneState.currentFilePath) {
           let autoSaveDir: string;
@@ -89,73 +118,101 @@ export function RengineEditor() {
           }
         }
       } catch (error) {
-        console.error("Failed to auto-save initial scene:", error);
+        console.error("Failed to initialize new project:", error);
       }
     };
 
-    autoSaveInitialScene();
+    initializeNewProject();
   }, []);
 
   return (
     <div className="flex h-screen flex-col bg-background">
       {/* Toolbar */}
-      <Toolbar
-        rightSidebarContext={rightSidebarContext}
-        setRightSidebarContext={setRightSidebarContext}
-      />
+      <Toolbar />
 
       {/* Main Editor Area */}
       <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Viewport Mode Tabs */}
+        <div className="flex border-b bg-background/50">
+          <Button
+            className={cn(
+              "h-8 flex-1 rounded-none px-3 font-medium text-xs",
+              viewportMode === "editor" &&
+                "border-primary border-b-2 bg-secondary text-secondary-foreground"
+            )}
+            onClick={() => setViewportMode("editor")}
+            size="sm"
+            variant={viewportMode === "editor" ? "secondary" : "ghost"}
+          >
+            Editor
+          </Button>
+          <Button
+            className={cn(
+              "h-8 flex-1 rounded-none px-3 font-medium text-xs",
+              viewportMode === "model-viewer" &&
+                "border-primary border-b-2 bg-secondary text-secondary-foreground"
+            )}
+            onClick={() => setViewportMode("model-viewer")}
+            size="sm"
+            variant={viewportMode === "model-viewer" ? "secondary" : "ghost"}
+          >
+            Model Viewer
+          </Button>
+        </div>
+
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left Sidebar - Scene Hierarchy */}
-          <UnifiedSidebar context="scene" />
+          <div className={cn("md:flex", showLeftSidebar ? "flex" : "hidden")}>
+            <RightSidebar context="scene" />
+          </div>
 
           {/* 3D Canvas - Main Viewport */}
-          <div className="relative flex-1">
-            <SceneCanvas />
+          <div className="relative min-w-0 flex-1">
+            {/* Mobile Sidebar Toggles */}
+            <div className="absolute top-2 left-2 z-20 flex gap-1 md:hidden">
+              <Button
+                className="h-8 w-8 p-0"
+                onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+                size="sm"
+                title="Toggle Scene Hierarchy"
+                variant="secondary"
+              >
+                <Package className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="absolute top-2 right-2 z-20 flex gap-1 lg:hidden">
+              <Button
+                className="h-8 w-8 p-0"
+                onClick={() => setShowRightSidebar(!showRightSidebar)}
+                size="sm"
+                title="Toggle Properties Panel"
+                variant="secondary"
+              >
+                <SettingsIcon className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {viewportMode === "editor" ? (
+              <SceneCanvas />
+            ) : (
+              <ModelViewerCanvas />
+            )}
           </div>
 
           {/* Right Sidebar - Properties/Tools */}
-          <UnifiedSidebar context={rightSidebarContext} />
-        </div>
-
-        {/* Status Bar */}
-        <div className="flex h-12 items-center justify-between border-t bg-background px-4 py-2">
-          {/* Left Side - Basic Info */}
-          <div className="flex items-center gap-4">
-            {/* Basic Scene Info */}
-            <div className="flex items-center gap-3 text-muted-foreground text-xs">
-              <div className="flex items-center gap-1">
-                <span>Objects:</span>
-                <span className="font-medium font-mono">
-                  {useSceneStore.getState().objects.length}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span>Lights:</span>
-                <span className="font-medium font-mono">
-                  {useSceneStore.getState().lights.length}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Side - Additional Info */}
-          <div className="flex items-center gap-3 text-muted-foreground text-xs">
-            <div className="flex items-center gap-1">
-              <span>Mode:</span>
-              <span className="font-medium">Editor</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span>Scene:</span>
-              <span className="font-medium">
-                {useSceneStore.getState().currentFilePath?.split("/").pop() ||
-                  "Untitled"}
-              </span>
-            </div>
+          <div className={cn("lg:flex", showRightSidebar ? "flex" : "hidden")}>
+            <RightSidebar
+              context={rightSidebarContext}
+              isRightSidebar={true}
+              onContextChange={setRightSidebarContext}
+            />
           </div>
         </div>
+
+        {/* Performance Footer with Scene Info */}
+        <PerformanceFooter />
       </div>
     </div>
   );

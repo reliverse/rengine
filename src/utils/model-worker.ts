@@ -2,10 +2,19 @@
 // This runs in a separate thread to keep the main UI responsive
 
 import * as THREE from "three";
+// GLTF Extensions
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 // Import Three.js loaders (these need to be available in the worker context)
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import {
+  applyGLTFMaterialExtensions,
+  extractGLTFCameras,
+  extractGLTFLights,
+  validateGLTFExtensions,
+} from "./gltf-extensions.js";
 
 interface WorkerMessage {
   type: "parse_gltf" | "parse_obj" | "parse_fbx" | "optimize_model";
@@ -33,7 +42,8 @@ function optimizeModel(model: THREE.Object3D): void {
         // Merge vertices if possible (reduces vertex count)
         if (
           child.geometry.attributes.position &&
-          child.geometry.attributes.normal
+          child.geometry.attributes.normal &&
+          child.geometry.index !== null
         ) {
           child.geometry = child.geometry.toNonIndexed();
         }
@@ -58,23 +68,85 @@ function optimizeModel(model: THREE.Object3D): void {
   model.userData.boundingBox = box;
 }
 
-// GLTF parsing function
+// GLTF parsing function with extensions support
 function parseGLTF(
   arrayBuffer: ArrayBuffer,
   onProgress?: (progress: number) => void
-): Promise<THREE.Object3D> {
+): Promise<{
+  scene: THREE.Object3D;
+  lights: THREE.Light[];
+  cameras: THREE.Camera[];
+  validation: any;
+  animations: THREE.AnimationClip[];
+  gltf: any;
+}> {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
+
+    // Configure Draco loader for mesh compression
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath(
+      "https://www.gstatic.com/draco/versioned/decoders/1.5.6/"
+    );
+    loader.setDRACOLoader(dracoLoader);
+
+    // Configure KTX2 loader for texture compression
+    const ktx2Loader = new KTX2Loader();
+    ktx2Loader.setTranscoderPath(
+      "https://unpkg.com/three@0.182.0/examples/jsm/libs/basis/"
+    );
+    loader.setKTX2Loader(ktx2Loader);
+
     onProgress?.(25);
 
     loader.parse(
       arrayBuffer,
       "",
       (gltf) => {
+        onProgress?.(50);
+
+        // Validate extensions
+        const validation = validateGLTFExtensions(gltf);
+
+        // Apply extension-specific material properties
+        gltf.scene.traverse((child: any) => {
+          if (child.isMesh && child.material) {
+            const materials = Array.isArray(child.material)
+              ? child.material
+              : [child.material];
+            materials.forEach((material: any, index: number) => {
+              if (material.userData?.gltfExtensions) {
+                const newMaterial = applyGLTFMaterialExtensions(
+                  material,
+                  material.userData,
+                  material.userData.gltfExtensions
+                );
+                if (Array.isArray(child.material)) {
+                  child.material[index] = newMaterial;
+                } else {
+                  child.material = newMaterial;
+                }
+              }
+            });
+          }
+        });
+
+        // Extract lights and cameras
+        const lights = extractGLTFLights(gltf);
+        const cameras = extractGLTFCameras(gltf);
+
         onProgress?.(75);
         optimizeModel(gltf.scene);
         onProgress?.(100);
-        resolve(gltf.scene);
+
+        resolve({
+          scene: gltf.scene,
+          lights,
+          cameras,
+          validation,
+          animations: gltf.animations || [],
+          gltf,
+        });
       },
       (error) => {
         reject(new Error(`GLTF parse error: ${error}`));
@@ -87,7 +159,14 @@ function parseGLTF(
 function parseOBJ(
   text: string,
   onProgress?: (progress: number) => void
-): Promise<THREE.Object3D> {
+): Promise<{
+  scene: THREE.Object3D;
+  lights: THREE.Light[];
+  cameras: THREE.Camera[];
+  validation: any;
+  animations: THREE.AnimationClip[];
+  gltf: any;
+}> {
   return new Promise((resolve, reject) => {
     onProgress?.(50);
     const loader = new OBJLoader();
@@ -97,7 +176,14 @@ function parseOBJ(
       onProgress?.(75);
       optimizeModel(object);
       onProgress?.(100);
-      resolve(object);
+      resolve({
+        scene: object,
+        lights: [],
+        cameras: [],
+        validation: null,
+        animations: [],
+        gltf: null,
+      });
     } catch (error) {
       reject(new Error(`OBJ parsing error: ${error}`));
     }
@@ -108,7 +194,14 @@ function parseOBJ(
 function parseFBX(
   arrayBuffer: ArrayBuffer,
   onProgress?: (progress: number) => void
-): Promise<THREE.Object3D> {
+): Promise<{
+  scene: THREE.Object3D;
+  lights: THREE.Light[];
+  cameras: THREE.Camera[];
+  validation: any;
+  animations: THREE.AnimationClip[];
+  gltf: any;
+}> {
   return new Promise((resolve, reject) => {
     onProgress?.(50);
     const loader = new FBXLoader();
@@ -118,7 +211,14 @@ function parseFBX(
       onProgress?.(75);
       optimizeModel(object);
       onProgress?.(100);
-      resolve(object);
+      resolve({
+        scene: object,
+        lights: [],
+        cameras: [],
+        validation: null,
+        animations: [],
+        gltf: null,
+      });
     } catch (error) {
       reject(new Error(`FBX parsing error: ${error}`));
     }
@@ -174,9 +274,57 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
     }
 
     // Convert the Three.js object to transferable data
+    const resultData = result as {
+      scene: THREE.Object3D;
+      lights: THREE.Light[];
+      cameras: THREE.Camera[];
+      validation: any;
+      animations: THREE.AnimationClip[];
+      gltf: any;
+    };
+    // Safely serialize GLTF data, excluding non-transferable objects
+    const gltfData = resultData.gltf
+      ? {
+          animations:
+            resultData.gltf.animations?.map((anim: any) => anim.toJSON()) || [],
+          scenes: resultData.gltf.scenes?.length || 0,
+          scene: resultData.gltf.scene ? 0 : null,
+          // Only include basic metadata, exclude complex objects
+          asset: resultData.gltf.asset
+            ? {
+                version: resultData.gltf.asset.version,
+                generator: resultData.gltf.asset.generator,
+              }
+            : undefined,
+        }
+      : null;
+
+    // Safely serialize lights and cameras, handling potential serialization issues
+    let lightsData: any[] = [];
+    let camerasData: any[] = [];
+
+    try {
+      lightsData = resultData.lights.map((light) => light.toJSON());
+    } catch (error) {
+      console.warn("Failed to serialize lights:", error);
+      lightsData = [];
+    }
+
+    try {
+      camerasData = resultData.cameras.map((camera) => camera.toJSON());
+    } catch (error) {
+      console.warn("Failed to serialize cameras:", error);
+      camerasData = [];
+    }
+
     const transferableData = {
-      object: (result as THREE.Object3D).toJSON(),
-      boundingBox: (result as THREE.Object3D).userData.boundingBox?.toJSON(),
+      object: resultData.scene.toJSON(),
+      boundingBox: resultData.scene.userData.boundingBox?.toJSON(),
+      lights: lightsData,
+      cameras: camerasData,
+      validation: resultData.validation,
+      animations: resultData.animations.map((anim) => anim.toJSON()),
+      gltf: gltfData,
     };
 
     self.postMessage({

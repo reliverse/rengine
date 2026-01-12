@@ -40,7 +40,10 @@ import {
   useSelectedMaterial,
 } from "~/stores/material-store";
 import { useTextureStore } from "~/stores/texture-store";
-import type { StandardMaterialProperties } from "~/types/materials";
+import type {
+  MaterialProperties,
+  StandardMaterialProperties,
+} from "~/types/materials";
 
 /**
  * Material presets for quick material setup
@@ -226,22 +229,22 @@ export function MaterialPropertyPanel() {
       open={expandedSections.has("basic")}
     >
       <CollapsibleTrigger>
-        <Card>
+        <Card className="w-full">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between font-medium text-sm">
-              <span className="flex items-center gap-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 font-medium text-sm">
                 <Settings className="h-4 w-4" />
                 Basic Properties
-              </span>
+              </CardTitle>
               <Badge variant="secondary">
                 {selectedMaterial.properties.type}
               </Badge>
-            </CardTitle>
+            </div>
           </CardHeader>
         </Card>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <Card>
+        <Card className="w-full">
           <CardContent className="space-y-4 pt-0">
             {/* Material Name */}
             <div className="space-y-2">
@@ -606,33 +609,40 @@ export function MaterialPropertyPanel() {
         trackTextureUsage(textureId, materialId);
 
         // Update material properties
-        updateMaterial({
+        updateMaterial(selectedMaterial.id, {
           [textureSlot]: {
-            ...selectedMaterial.properties[textureSlot],
+            ...(selectedMaterial.properties[
+              textureSlot as keyof MaterialProperties
+            ] as any),
             texture: textureId,
           },
-        });
+        } as Partial<MaterialProperties>);
       } else {
         // Clear texture assignment
-        const currentTextureId =
-          selectedMaterial.properties[textureSlot]?.texture;
+        const currentTextureId = (selectedMaterial.properties as any)[
+          textureSlot
+        ]?.texture;
         if (currentTextureId) {
           untrackTextureUsage(currentTextureId, materialId);
         }
 
-        updateMaterial({
+        updateMaterial(selectedMaterial.id, {
           [textureSlot]: {
-            ...selectedMaterial.properties[textureSlot],
+            ...(selectedMaterial.properties[
+              textureSlot as keyof MaterialProperties
+            ] as any),
             texture: null,
           },
-        });
+        } as Partial<MaterialProperties>);
       }
     };
 
     const getCurrentTextureId = (
       textureSlot: keyof StandardMaterialProperties
     ) => {
-      return selectedMaterial?.properties[textureSlot]?.texture || null;
+      return (
+        (selectedMaterial?.properties as any)?.[textureSlot]?.texture || null
+      );
     };
 
     return (
@@ -917,17 +927,19 @@ export function MaterialPropertyPanel() {
       open={expandedSections.has("presets")}
     >
       <CollapsibleTrigger>
-        <Card>
+        <Card className="w-full">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 font-medium text-sm">
-              <Library className="h-4 w-4" />
-              Material Presets
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 font-medium text-sm">
+                <Library className="h-4 w-4" />
+                Material Presets
+              </CardTitle>
+            </div>
           </CardHeader>
         </Card>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <Card>
+        <Card className="w-full">
           <CardContent className="space-y-4 pt-0">
             {/* Category Selection */}
             <div className="space-y-2">

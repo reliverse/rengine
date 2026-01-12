@@ -232,6 +232,20 @@ export const PerformanceFooter = memo(function PerformanceFooter({
             </Badge>
           )}
 
+          {/* Scene Title */}
+          <div className="flex items-center gap-1">
+            <span
+              className={`font-medium text-muted-foreground text-xs ${
+                useSceneStore.getState().sceneMetadata.isModified
+                  ? "text-orange-600"
+                  : ""
+              }`}
+            >
+              {useSceneStore.getState().sceneMetadata.name}
+              {useSceneStore.getState().sceneMetadata.isModified && " *"}
+            </span>
+          </div>
+
           {/* Environment Info */}
           <div className="text-muted-foreground text-xs">
             {process.env.NODE_ENV === "development" ? "DEV" : "PROD"}

@@ -44,6 +44,74 @@
 	--sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Professional Dark Theme Variables (RWMS-style) */
+:root {
+	/* Background Colors */
+	--theme-background-primary: #1e1e1e;
+	--theme-background-secondary: #252526;
+	--theme-background-tertiary: #2d2d30;
+	--theme-background-accent: #37373d;
+	--theme-background-hover: #3e3e42;
+	--theme-background-selected: #37373d;
+	--theme-background-disabled: #3c3c3c;
+
+	/* Text Colors */
+	--theme-text-primary: #cccccc;
+	--theme-text-secondary: #969696;
+	--theme-text-tertiary: #6b6b6b;
+	--theme-text-accent: #007acc;
+	--theme-text-success: #4ec9b0;
+	--theme-text-warning: #dcdcaa;
+	--theme-text-error: #f44747;
+	--theme-text-disabled: #696969;
+	--theme-text-link: #3794ff;
+
+	/* Border Colors */
+	--theme-border-primary: #2d2d30;
+	--theme-border-secondary: #464647;
+	--theme-border-tertiary: #5c5c5c;
+	--theme-border-accent: #007acc;
+	--theme-border-focus: #007acc;
+	--theme-border-error: #f44747;
+
+	/* Interactive Colors */
+	--theme-hover-color: #3e3e42;
+	--theme-selection-color: #37373d;
+	--theme-focus-color: #007acc;
+
+	/* Button Colors */
+	--theme-button-primary: #0e639c;
+	--theme-button-secondary: #3c3c3c;
+	--theme-button-success: #0f7b0f;
+	--theme-button-warning: #f9a825;
+	--theme-button-danger: #d32f2f;
+	--theme-button-disabled: #696969;
+	--theme-button-hover: #1177bb;
+	--theme-button-pressed: #0a4f7a;
+
+	/* Input Colors */
+	--theme-input-background: #3c3c3c;
+	--theme-input-border: #464647;
+	--theme-input-focus: #007acc;
+	--theme-input-error: #f44747;
+	--theme-input-disabled: #2d2d30;
+
+	/* Status Colors */
+	--theme-status-success: #4ec9b0;
+	--theme-status-warning: #dcdcaa;
+	--theme-status-error: #f44747;
+	--theme-status-info: #3794ff;
+	--theme-status-neutral: #969696;
+
+	/* Special Colors */
+	--theme-scrollbar-track: #2d2d30;
+	--theme-scrollbar-thumb: #464647;
+	--theme-tooltip-background: #2d2d30;
+	--theme-tooltip-text: #cccccc;
+	--theme-overlay-background: rgba(0, 0, 0, 0.6);
+	--theme-shadow-color: rgba(0, 0, 0, 0.3);
+}
+
 .dark {
 	--background: oklch(0.05 0 0);
 	--foreground: oklch(0.985 0 0);

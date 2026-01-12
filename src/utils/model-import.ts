@@ -1,13 +1,18 @@
+import * as THREE from "three";
 import {
   Box3,
   type Box3JSON,
   Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
   type Object3D,
   type Object3DJSON,
   ObjectLoader,
   Vector3,
 } from "three";
-import type { SceneObject } from "~/stores/scene-store";
+import type { SceneLight, SceneObject } from "~/stores/scene-store";
+import { createAnimationController } from "./animation-system";
+import { validateGLTF } from "./gltf-extensions";
 import { textureOptimizer } from "./texture-optimizer";
 import { workerManager } from "./worker-manager";
 
@@ -15,6 +20,11 @@ import { workerManager } from "./worker-manager";
 interface ParseResult {
   object: Object3DJSON; // THREE.Object3D JSON representation (full structure with metadata)
   boundingBox?: Box3JSON; // THREE.Box3 JSON representation
+  lights?: any[]; // Extracted lights from GLTF
+  cameras?: any[]; // Extracted cameras from GLTF
+  validation?: any; // GLTF extension validation results
+  animations?: any[]; // GLTF animations JSON
+  gltf?: any; // Full GLTF object for animation access
 }
 
 const FILE_EXTENSION_REGEX = /\.[^/.]+$/;
@@ -38,7 +48,10 @@ export interface ImportProgress {
 
 export interface ImportResult {
   success: boolean;
-  object?: SceneObject;
+  objects?: SceneObject[]; // Now returns array of objects for hierarchy support
+  object?: SceneObject; // Keep for backward compatibility
+  lights?: SceneLight[];
+  cameras?: any[]; // Camera objects from GLTF
   error?: string;
   warnings?: string[];
 }
@@ -53,9 +66,29 @@ const validateFile = (
   warnings: string[];
 } => {
   const warnings: string[] = [];
-  const maxFileSize = 50 * 1024 * 1024; // 50MB limit
   const fileExtension = file.name.split(".").pop()?.toLowerCase();
 
+  // For GLTF/GLB files, do comprehensive validation
+  if (fileExtension === "gltf" || fileExtension === "glb") {
+    try {
+      // Quick file-level validation first
+      const basicValidation = validateGLTF(file);
+      warnings.push(...basicValidation.warnings);
+
+      if (!basicValidation.valid) {
+        return {
+          valid: false,
+          error: basicValidation.errors.join("; "),
+          warnings,
+        };
+      }
+    } catch (error) {
+      // If validation fails, continue with basic checks
+      console.warn("GLTF validation failed:", error);
+    }
+  }
+
+  const maxFileSize = 50 * 1024 * 1024; // 50MB limit
   if (file.size > maxFileSize) {
     return {
       valid: false,
@@ -66,6 +99,14 @@ const validateFile = (
 
   if (file.size > 10 * 1024 * 1024) {
     warnings.push("Large file detected - loading may take longer");
+  }
+
+  if (file.size === 0) {
+    return {
+      valid: false,
+      error: "File is empty",
+      warnings,
+    };
   }
 
   const supportedFormats = ["gltf", "glb", "obj", "fbx"];
@@ -170,6 +211,23 @@ const loadGLTF = (
           const box = new Box3();
           box.fromJSON(result.boundingBox);
           object3D.userData.boundingBox = box;
+        }
+
+        // Store GLTF metadata
+        if (result.lights) {
+          object3D.userData.gltfLights = result.lights;
+        }
+        if (result.cameras) {
+          object3D.userData.gltfCameras = result.cameras;
+        }
+        if (result.validation) {
+          object3D.userData.gltfValidation = result.validation;
+        }
+        if (result.animations) {
+          object3D.userData.gltfAnimations = result.animations;
+        }
+        if (result.gltf) {
+          object3D.userData.gltf = result.gltf;
         }
 
         // Optimize textures in the model
@@ -346,38 +404,27 @@ const optimizeModelTextures = (model: Object3D): void => {
   });
 };
 
-const createSceneObjectFromModel = (
+const createSceneObjectsFromModel = (
   model: Object3D,
   fileName: string,
   position: [number, number, number],
   warnings: string[]
-): SceneObject => {
-  let vertexCount = 0;
-  let geometryCount = 0;
+): SceneObject[] => {
+  const sceneObjects: SceneObject[] = [];
+  let totalVertexCount = 0;
+  let totalGeometryCount = 0;
 
+  // Count meshes and vertices
   model.traverse((child) => {
     if (child instanceof Mesh && child.geometry) {
-      geometryCount++;
+      totalGeometryCount++;
       if (child.geometry.attributes.position) {
-        vertexCount += child.geometry.attributes.position.count;
+        totalVertexCount += child.geometry.attributes.position.count;
       }
     }
   });
 
-  if (vertexCount > 100_000) {
-    warnings.push(
-      `High vertex count (${vertexCount.toLocaleString()}) - may impact performance`
-    );
-  } else if (vertexCount > 50_000) {
-    warnings.push(`Large model (${vertexCount.toLocaleString()} vertices)`);
-  }
-
-  if (geometryCount > 50) {
-    warnings.push(
-      `Many geometry objects (${geometryCount}) - consider optimizing`
-    );
-  }
-
+  // Calculate overall bounding box for scaling
   const box = new Box3().setFromObject(model);
   const size = box.getSize(new Vector3());
   const center = box.getCenter(new Vector3());
@@ -391,27 +438,83 @@ const createSceneObjectFromModel = (
     );
   }
 
+  // Center the model
   if (!box.isEmpty() && center.length() > 0.001) {
     model.position.sub(center);
   }
 
   const maxDimension = Math.max(size.x, size.y, size.z);
-  const scale = maxDimension > 0 ? 2 / maxDimension : 1;
+  const globalScale = maxDimension > 0 ? 2 / maxDimension : 1;
+  const safeGlobalScale =
+    Number.isNaN(globalScale) || !Number.isFinite(globalScale)
+      ? 1
+      : globalScale;
 
-  const safeScale = Number.isNaN(scale) || !Number.isFinite(scale) ? 1 : scale;
+  // Apply initial scaling to the model
+  model.scale.setScalar(safeGlobalScale);
 
-  return {
+  // Ensure all meshes have materials for proper rendering and selection
+  model.traverse((child) => {
+    if (child instanceof Mesh) {
+      if (!child.material) {
+        child.material = new MeshStandardMaterial({
+          color: 0xff_ff_ff,
+          roughness: 0.5,
+          metalness: 0.0,
+        });
+      }
+      // Ensure material is an array or single material for proper raycasting
+      if (Array.isArray(child.material)) {
+        for (const mat of child.material) {
+          if (
+            mat instanceof MeshStandardMaterial ||
+            mat instanceof MeshBasicMaterial
+          ) {
+            mat.transparent = false;
+          }
+        }
+      } else if (
+        child.material instanceof MeshStandardMaterial ||
+        child.material instanceof MeshBasicMaterial
+      ) {
+        child.material.transparent = false;
+      }
+    }
+  });
+
+  if (totalVertexCount > 100_000) {
+    warnings.push(
+      `High vertex count (${totalVertexCount.toLocaleString()}) - may impact performance`
+    );
+  } else if (totalVertexCount > 50_000) {
+    warnings.push(
+      `Large model (${totalVertexCount.toLocaleString()} vertices)`
+    );
+  }
+
+  if (totalGeometryCount > 50) {
+    warnings.push(
+      `Complex model with ${totalGeometryCount} geometry objects - rendered as single selectable object`
+    );
+  }
+
+  // Create a single scene object for the entire model (better for selection and performance)
+  const sceneObject: SceneObject = {
     id: `imported_${Math.random().toString(36).substr(2, 9)}`,
     name: fileName.replace(FILE_EXTENSION_REGEX, ""),
     type: "imported",
     position,
     rotation: [0, 0, 0],
-    scale: [1, 1, 1],
+    scale: [1, 1, 1], // Scaling is applied to the model itself
     color: "#ffffff",
     visible: true,
     importedModel: model,
-    initialScale: safeScale,
+    initialScale: safeGlobalScale,
   };
+
+  sceneObjects.push(sceneObject);
+
+  return sceneObjects;
 };
 
 export const importFromFile = async (
@@ -425,7 +528,7 @@ export const importFromFile = async (
   try {
     onProgress?.({ loaded: 0, total: 100, stage: "Validating file" });
 
-    const validation = validateFile(file);
+    const validation = await validateFile(file);
     if (!validation.valid) {
       return {
         success: false,
@@ -442,6 +545,10 @@ export const importFromFile = async (
       case "gltf":
       case "glb":
         object3D = await loadGLTF(file, onProgress);
+        // Add GLTF extension warnings
+        if (object3D?.userData.gltfValidation) {
+          warnings.push(...object3D.userData.gltfValidation.warnings);
+        }
         break;
       case "obj":
         object3D = await loadOBJ(file, onProgress);
@@ -463,20 +570,99 @@ export const importFromFile = async (
       };
     }
 
-    onProgress?.({ loaded: 90, total: 100, stage: "Creating scene object" });
+    onProgress?.({ loaded: 90, total: 100, stage: "Creating scene objects" });
 
-    const sceneObject = createSceneObjectFromModel(
+    const sceneObjects = createSceneObjectsFromModel(
       object3D,
       file.name,
       position,
       warnings
     );
 
+    // Create animation controller if animations are present
+    if (
+      object3D.userData.gltfAnimations &&
+      object3D.userData.gltfAnimations.length > 0
+    ) {
+      try {
+        // Convert animation JSON back to AnimationClips
+        const animations = object3D.userData.gltfAnimations.map(
+          (animData: any) => {
+            return THREE.AnimationClip.parse(animData);
+          }
+        );
+
+        // Create a temporary GLTF-like object for the animation controller
+        const gltfWithAnimations = {
+          animations,
+          // Add minimal GLTF structure that the animation controller might expect
+          scene: object3D,
+        };
+
+        const animationController = createAnimationController(
+          gltfWithAnimations,
+          object3D
+        );
+        // Attach animation controller to the first scene object
+        if (sceneObjects.length > 0) {
+          sceneObjects[0].animationController = animationController;
+        }
+
+        if (animations.length > 0) {
+          warnings.push(
+            `Loaded ${animations.length} animation(s): ${animations.map((a: THREE.AnimationClip) => a.name || "Unnamed").join(", ")}`
+          );
+        }
+      } catch (error) {
+        warnings.push(`Failed to create animation controller: ${error}`);
+      }
+    }
+
+    // Create scene lights from GLTF lights
+    let sceneLights: SceneLight[] | undefined;
+    if (
+      object3D.userData.gltfLights &&
+      object3D.userData.gltfLights.length > 0
+    ) {
+      try {
+        sceneLights = createSceneLightsFromGLTF(
+          object3D.userData.gltfLights,
+          position
+        );
+        if (sceneLights.length > 0) {
+          warnings.push(`Imported ${sceneLights.length} light(s) from GLTF`);
+        }
+      } catch (error) {
+        warnings.push(`Failed to import lights: ${error}`);
+      }
+    }
+
+    // Create scene cameras from GLTF cameras
+    let sceneCameras: any[] | undefined;
+    if (
+      object3D.userData.gltfCameras &&
+      object3D.userData.gltfCameras.length > 0
+    ) {
+      try {
+        sceneCameras = createSceneCamerasFromGLTF(
+          object3D.userData.gltfCameras
+        );
+        if (sceneCameras.length > 0) {
+          warnings.push(`Imported ${sceneCameras.length} camera(s) from GLTF`);
+        }
+      } catch (error) {
+        warnings.push(`Failed to import cameras: ${error}`);
+      }
+    }
+
     onProgress?.({ loaded: 100, total: 100, stage: "Import complete" });
 
     return {
       success: true,
-      object: sceneObject,
+      objects: sceneObjects,
+      object: sceneObjects[0], // Keep for backward compatibility
+      lights: sceneLights,
+      cameras: sceneCameras,
       warnings: warnings.length > 0 ? warnings : undefined,
     };
   } catch (error) {
@@ -488,6 +674,130 @@ export const importFromFile = async (
     };
   }
 };
+
+// Convert GLTF lights to scene lights
+function createSceneLightsFromGLTF(
+  gltfLights: any[],
+  basePosition: [number, number, number]
+): SceneLight[] {
+  if (!gltfLights || gltfLights.length === 0) return [];
+
+  return gltfLights.map((lightData: any, index: number) => {
+    // Parse the light data (it's stored as JSON)
+    const light = new ObjectLoader().parse(lightData) as THREE.Light;
+
+    // Determine light type and properties
+    let lightType: SceneLight["type"] = "directional";
+    let color = "#ffffff";
+    let intensity = 1;
+    let distance = 0;
+    let decay = 1;
+
+    if (light instanceof THREE.DirectionalLight) {
+      lightType = "directional";
+      color = `#${light.color.getHexString()}`;
+      intensity = light.intensity || 1;
+    } else if (light instanceof THREE.PointLight) {
+      lightType = "point";
+      color = `#${light.color.getHexString()}`;
+      intensity = light.intensity || 1;
+      distance = light.distance || 0;
+      decay = light.decay || 1;
+    } else if (light instanceof THREE.SpotLight) {
+      lightType = "spot";
+      color = `#${light.color.getHexString()}`;
+      intensity = light.intensity || 1;
+      distance = light.distance || 0;
+      decay = light.decay || 1;
+    }
+
+    // Calculate position relative to the imported model
+    const position: [number, number, number] = [
+      basePosition[0] + (light.position?.x || 0),
+      basePosition[1] + (light.position?.y || 0),
+      basePosition[2] + (light.position?.z || 0),
+    ];
+
+    // Calculate target for directional and spot lights
+    let target: [number, number, number] | undefined;
+    if (
+      (lightType === "directional" || lightType === "spot") &&
+      light instanceof THREE.DirectionalLight &&
+      light.target
+    ) {
+      target = [
+        basePosition[0] + light.target.position.x,
+        basePosition[1] + light.target.position.y,
+        basePosition[2] + light.target.position.z,
+      ];
+    } else if (
+      lightType === "spot" &&
+      light instanceof THREE.SpotLight &&
+      light.target
+    ) {
+      target = [
+        basePosition[0] + light.target.position.x,
+        basePosition[1] + light.target.position.y,
+        basePosition[2] + light.target.position.z,
+      ];
+    }
+
+    return {
+      id: `gltf_light_${Date.now()}_${index}`,
+      name: `GLTF Light ${index + 1}`,
+      type: lightType,
+      position,
+      target,
+      color,
+      intensity,
+      distance,
+      decay,
+      castShadow: light.castShadow,
+      shadowMapSize:
+        light.shadow?.mapSize instanceof THREE.Vector2
+          ? light.shadow.mapSize.x
+          : typeof light.shadow?.mapSize === "number"
+            ? light.shadow.mapSize
+            : 1024,
+      shadowCameraNear:
+        (
+          light.shadow?.camera as
+            | THREE.PerspectiveCamera
+            | THREE.OrthographicCamera
+        )?.near || 0.1,
+      shadowCameraFar:
+        (
+          light.shadow?.camera as
+            | THREE.PerspectiveCamera
+            | THREE.OrthographicCamera
+        )?.far || 100,
+      shadowCameraFov:
+        (light.shadow?.camera as THREE.PerspectiveCamera)?.fov || 50,
+      shadowBias: light.shadow?.bias || 0,
+      visible: true,
+    };
+  });
+}
+
+// Convert GLTF cameras to scene cameras (for now, we'll store them as metadata)
+function createSceneCamerasFromGLTF(gltfCameras: any[]): any[] {
+  if (!gltfCameras || gltfCameras.length === 0) return [];
+
+  return gltfCameras.map((cameraData: any, index: number) => {
+    // Parse the camera data
+    const camera = new ObjectLoader().parse(cameraData) as THREE.Camera;
+
+    return {
+      id: `gltf_camera_${Date.now()}_${index}`,
+      name: `GLTF Camera ${index + 1}`,
+      camera,
+      type:
+        camera instanceof THREE.PerspectiveCamera
+          ? "perspective"
+          : "orthographic",
+    };
+  });
+}
 
 // Utility function to clear cache (useful for memory management)
 export const clearModelCache = (): void => {

@@ -62,7 +62,15 @@ export function LightingPanel() {
         LIGHTING_PRESETS[selectedPreset as keyof typeof LIGHTING_PRESETS];
       clearLights();
       for (const light of preset.lights) {
-        addLight(light);
+        const { target, ...restLight } = light as any;
+        const lightConfig = {
+          ...restLight,
+          position: [...light.position] as [number, number, number],
+        };
+        if (target) {
+          lightConfig.target = [...target] as [number, number, number];
+        }
+        addLight(lightConfig);
       }
     }
   };

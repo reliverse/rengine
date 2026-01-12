@@ -78,6 +78,7 @@ export function SceneCanvas() {
     fogColor,
     fogNear,
     fogFar,
+    skyboxEnabled,
   } = useSceneStore();
   const [isDragOver, setIsDragOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -171,12 +172,31 @@ export function SceneCanvas() {
               }
             );
 
-            if (result.success && result.object) {
-              useSceneStore.getState().addObject(result.object);
+            if (result.success && result.objects) {
+              const sceneStore = useSceneStore.getState();
+
+              // Add all objects from the hierarchy
+              for (const obj of result.objects) {
+                sceneStore.addObject(obj);
+              }
+
+              // Add lights from GLTF
+              if (result.lights && result.lights.length > 0) {
+                for (const light of result.lights) {
+                  sceneStore.addLight(light);
+                }
+              }
+
+              const objectCount = result.objects.length;
+              const lightCount = result.lights?.length || 0;
+              const description =
+                objectCount === 1
+                  ? `${result.objects[0].name} added to scene`
+                  : `${objectCount} objects added to scene${lightCount > 0 ? ` with ${lightCount} light(s)` : ""}`;
 
               toast({
                 title: "Model imported",
-                description: `${result.object.name} added to scene`,
+                description,
                 duration: 2000,
               });
 
@@ -216,8 +236,6 @@ export function SceneCanvas() {
 
   return (
     <>
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: Drag-drop area needs event handlers */}
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Drag-drop area needs event handlers */}
       <div
         className={cn(
           "relative h-full w-full",
@@ -226,7 +244,9 @@ export function SceneCanvas() {
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        style={{ backgroundColor }}
+        style={{
+          backgroundColor: skyboxEnabled ? "transparent" : backgroundColor,
+        }}
       >
         {/* Drag overlay */}
         {isDragOver && (
@@ -254,6 +274,10 @@ export function SceneCanvas() {
             antialias: true,
             alpha: false,
             powerPreference: "high-performance",
+            // Enable hardware acceleration optimizations
+            stencil: false,
+            depth: true,
+            logarithmicDepthBuffer: false,
           }}
           onCreated={({ camera, scene }) => {
             camera.lookAt(...cameraTarget);

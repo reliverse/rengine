@@ -10,6 +10,7 @@ import type {
   StandardMaterialProperties,
   ToonMaterialProperties,
 } from "~/types/materials";
+import { getReflectionTexture } from "~/utils/reflection-manager";
 import {
   applyTextureChannelProperties,
   getCachedTexture,
@@ -96,6 +97,9 @@ export function createBasicMaterial(
 export function createStandardMaterial(
   properties: StandardMaterialProperties
 ): THREE.MeshPhysicalMaterial {
+  // Get reflection texture for envMap if available
+  const reflectionTexture = getReflectionTexture();
+
   const material = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(properties.color),
     opacity: properties.opacity,
@@ -145,6 +149,11 @@ export function createStandardMaterial(
     attenuationDistance: properties.attenuationDistance,
     attenuationColor: new THREE.Color(properties.attenuationColor),
   });
+
+  // Apply environment map for reflections
+  if (reflectionTexture) {
+    material.envMap = reflectionTexture;
+  }
 
   // Apply textures
   const mapTexture = getCachedTexture(properties.map.texture);

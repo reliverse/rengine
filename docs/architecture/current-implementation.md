@@ -9,6 +9,7 @@ Rengine is currently implemented as a modern 3D scene editor and prototyping too
 ### Technology Stack
 
 #### Frontend (React + TypeScript)
+
 - **React 19**: Modern React with concurrent features
 - **TypeScript**: Full type safety throughout the application
 - **TanStack Router**: File-based routing for the application
@@ -18,11 +19,13 @@ Rengine is currently implemented as a modern 3D scene editor and prototyping too
 - **Tailwind CSS**: Utility-first styling system
 
 #### Backend (Rust + Tauri)
+
 - **Tauri 2**: Cross-platform desktop application framework
 - **Rust**: Native performance and security
 - **File System APIs**: Native file operations for scene persistence
 
 #### 3D Graphics
+
 - **Three.js**: WebGL-based 3D graphics engine
 - **React Three Drei**: Useful helpers and abstractions
 - **GLTF/GLB Support**: Modern 3D model format
@@ -33,6 +36,7 @@ Rengine is currently implemented as a modern 3D scene editor and prototyping too
 ### Scene Management System
 
 #### State Architecture
+
 ```typescript
 interface SceneState {
   // 3D Objects
@@ -67,6 +71,7 @@ interface SceneState {
 ```
 
 #### Scene Object Structure
+
 ```typescript
 interface SceneObject {
   id: string;
@@ -88,6 +93,7 @@ interface SceneObject {
 ```
 
 #### Lighting System
+
 ```typescript
 interface SceneLight {
   id: string;
@@ -119,6 +125,7 @@ interface SceneLight {
 ### Rendering Pipeline
 
 #### React Three Fiber Integration
+
 ```typescript
 function SceneCanvas() {
   return (
@@ -154,6 +161,7 @@ function SceneCanvas() {
 ```
 
 #### Object Rendering
+
 ```typescript
 function SceneObjectMesh({ object }: { object: SceneObject }) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -200,6 +208,7 @@ function SceneObjectMesh({ object }: { object: SceneObject }) {
 ### File Management System
 
 #### Scene Persistence
+
 ```typescript
 interface ScenePersistence {
   // Save scene to file
@@ -214,6 +223,7 @@ interface ScenePersistence {
 ```
 
 #### Auto-save Functionality
+
 ```typescript
 useEffect(() => {
   const autoSaveInterval = setInterval(() => {
@@ -230,11 +240,13 @@ useEffect(() => {
 ### 3D Model Import System
 
 #### Supported Formats
+
 - **GLTF/GLB**: Modern format with materials, animations, and PBR
 - **OBJ**: Wavefront OBJ with MTL material support
 - **FBX**: Autodesk FBX for complex scenes
 
 #### Import Process
+
 ```typescript
 interface ImportResult {
   success: boolean;
@@ -273,10 +285,11 @@ async function importModel(file: File): Promise<ImportResult> {
 ### User Interface Architecture
 
 #### Component Hierarchy
+
 ```
 App
 ├── Toolbar (File, Edit, View, Tools)
-├── UnifiedSidebar
+├── RightSidebar
 │   ├── SceneHierarchy (Object tree)
 │   └── PropertyPanel (Object/light properties)
 └── SceneCanvas (3D viewport)
@@ -287,6 +300,7 @@ App
 ```
 
 #### State Management
+
 ```typescript
 // Zustand store with middleware
 export const useSceneStore = create<SceneState & SceneActions>()(
@@ -319,6 +333,7 @@ export const useSceneStore = create<SceneState & SceneActions>()(
 ### Tool System
 
 #### Transform Tools
+
 ```typescript
 type TransformTool = "select" | "move" | "rotate" | "scale";
 
@@ -332,6 +347,7 @@ interface TransformControls {
 ```
 
 #### Tool Gizmos
+
 - **Select Tool**: Object selection and highlighting
 - **Move Tool**: Position translation with XYZ handles
 - **Rotate Tool**: Rotation with axis rings
@@ -340,6 +356,7 @@ interface TransformControls {
 ### Lighting System
 
 #### Light Types Implementation
+
 ```typescript
 function SceneLight({ light }: { light: SceneLight }) {
   const lightRef = useRef<THREE.Light>(null);
@@ -377,6 +394,7 @@ function SceneLight({ light }: { light: SceneLight }) {
 ```
 
 #### Lighting Presets
+
 ```typescript
 const lightingPresets = {
   default: () => [
@@ -397,6 +415,7 @@ const lightingPresets = {
 ## Development Workflow
 
 ### Build System
+
 ```json
 {
   "scripts": {
@@ -410,12 +429,14 @@ const lightingPresets = {
 ```
 
 ### Development Setup
+
 1. **Install Dependencies**: `bun install`
 2. **Start Development**: `bun start`
 3. **Run Tests**: `bun test`
 4. **Build Production**: `bun run build`
 
 ### Code Quality
+
 - **Biome**: Linting and formatting
 - **TypeScript**: Type checking
 - **Vitest**: Unit testing
@@ -424,17 +445,20 @@ const lightingPresets = {
 ## Performance Optimizations
 
 ### Rendering Optimizations
+
 - **Object Instancing**: Efficient rendering of multiple similar objects
 - **LOD System**: Level-of-detail for complex models
 - **Frustum Culling**: Only render visible objects
 - **Shadow Mapping**: Optimized shadow rendering
 
 ### Memory Management
+
 - **Asset Caching**: Prevent duplicate asset loading
 - **Geometry Pooling**: Reuse geometry instances
 - **Texture Atlasing**: Combine small textures
 
 ### UI Performance
+
 - **Virtual Scrolling**: For large scene hierarchies
 - **Debounced Updates**: Prevent excessive re-renders
 - **Lazy Loading**: Load components on demand
@@ -442,18 +466,21 @@ const lightingPresets = {
 ## Future Roadmap
 
 ### Short Term (Next Release)
+
 - [ ] Undo/Redo system
 - [ ] Copy/Paste objects
 - [ ] Advanced material editor
 - [ ] Export to GLTF format
 
 ### Medium Term (3-6 months)
+
 - [ ] Animation timeline
 - [ ] Physics simulation
 - [ ] Plugin system
 - [ ] Multi-scene support
 
 ### Long Term (6+ months)
+
 - [ ] Real-time collaboration
 - [ ] Advanced rendering pipeline
 - [ ] Scripting system
@@ -462,6 +489,7 @@ const lightingPresets = {
 ## Migration Path
 
 ### From Current to Full Engine
+
 The current 3D scene editor serves as the foundation for a full game engine:
 
 1. **Scene Editor** (Current): Core 3D editing capabilities
@@ -469,6 +497,7 @@ The current 3D scene editor serves as the foundation for a full game engine:
 3. **Full Engine**: Advanced features like networking, audio, etc.
 
 ### Backward Compatibility
+
 - Scene files remain compatible
 - Plugin API evolves gradually
 - Migration tools provided for breaking changes

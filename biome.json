@@ -44,6 +44,11 @@
       },
       "suspicious": {
         "noExplicitAny": "off"
+      },
+      "a11y": {
+        "noStaticElementInteractions": "off",
+        "noNoninteractiveElementInteractions": "off",
+        "useSemanticElements": "off"
       }
     }
   },
