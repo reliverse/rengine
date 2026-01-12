@@ -27,7 +27,6 @@ function LightGizmo({ light, isSelected, onSelect }: LightGizmoProps) {
   const handlePointerOut = () => setHovered(false);
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: This is a 3D interactive element, not an HTML element
     <group
       onClick={handleClick}
       onPointerOut={handlePointerOut}

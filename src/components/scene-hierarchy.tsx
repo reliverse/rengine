@@ -8,18 +8,395 @@ import {
   Lightbulb,
   Moon,
   Package,
+  Settings as SettingsIcon,
   Square,
   Sun,
   Zap,
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
+import { SKYBOX_PRESETS } from "~/components/skybox";
 // import { FixedSizeTree as Tree } from "react-vtree";
 import { Badge } from "~/components/ui/badge";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Slider } from "~/components/ui/slider";
+import { Switch } from "~/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { cn } from "~/lib/utils";
 import { useSceneStore } from "~/stores/scene-store";
+import {
+  useAdaptiveQualityEnabled,
+  useGraphicsSettings,
+  usePerformanceMonitorEnabled,
+  useSettingsStore,
+} from "~/stores/settings-store";
+import { QualityLevel, type QualityLevelType } from "~/utils/adaptive-quality";
+import { useTheme } from "./theme-provider";
 
 // Regex for UUID validation
 const UUID_REGEX = /^[0-9a-f-]+$/;
+
+// Settings content component
+function SettingsContent() {
+  const { theme, setTheme } = useTheme();
+  const {
+    precision,
+    setPrecision,
+    setPerformanceMonitorEnabled,
+    setGraphicsSettings,
+    setQualityLevel,
+    setAdaptiveQualityEnabled,
+  } = useSettingsStore();
+  const performanceMonitorEnabled = usePerformanceMonitorEnabled();
+  const graphicsSettings = useGraphicsSettings();
+  const adaptiveQualityEnabled = useAdaptiveQualityEnabled();
+
+  // Skybox settings
+  const {
+    skyboxEnabled,
+    skyboxPreset,
+    skyboxIntensity,
+    setSkyboxEnabled,
+    setSkyboxPreset,
+    setSkyboxIntensity,
+  } = useSceneStore();
+
+  return (
+    <div className="space-y-6 p-4">
+      {/* Appearance Section */}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Theme</Label>
+          <Select
+            onValueChange={(value) =>
+              setTheme(value as "light" | "dark" | "system")
+            }
+            value={theme}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="dark">Dark</SelectItem>
+              <SelectItem value="system">System</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Graphics Quality Section */}
+      <div className="space-y-6">
+        {/* Quality Level */}
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Quality Preset</Label>
+            <p className="text-muted-foreground text-sm">
+              Overall graphics quality level. Higher settings use more
+              resources.
+            </p>
+          </div>
+          <Select
+            onValueChange={(value) =>
+              setQualityLevel(Number(value) as QualityLevelType)
+            }
+            value={graphicsSettings.qualityLevel.toString()}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={QualityLevel.ULTRA.toString()}>
+                Ultra - Maximum quality (High-end GPUs only)
+              </SelectItem>
+              <SelectItem value={QualityLevel.HIGH.toString()}>
+                High - Balanced performance and quality
+              </SelectItem>
+              <SelectItem value={QualityLevel.MEDIUM.toString()}>
+                Medium - Good quality with better performance
+              </SelectItem>
+              <SelectItem value={QualityLevel.LOW.toString()}>
+                Low - Basic quality for lower-end hardware
+              </SelectItem>
+              <SelectItem value={QualityLevel.POTATO.toString()}>
+                Potato - Minimum settings for very low-end hardware
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Adaptive Quality */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Adaptive Quality</Label>
+            <p className="text-muted-foreground text-sm">
+              Automatically adjust quality based on performance
+            </p>
+          </div>
+          <Switch
+            checked={adaptiveQualityEnabled}
+            onCheckedChange={setAdaptiveQualityEnabled}
+          />
+        </div>
+
+        {/* Rendering Features */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm">Rendering Features</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Anti-aliasing</Label>
+                <p className="text-muted-foreground text-xs">Smooth edges</p>
+              </div>
+              <Switch
+                checked={graphicsSettings.antialias}
+                onCheckedChange={(checked) =>
+                  setGraphicsSettings({ antialias: checked })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Shadows</Label>
+                <p className="text-muted-foreground text-xs">Dynamic shadows</p>
+              </div>
+              <Switch
+                checked={graphicsSettings.shadows}
+                onCheckedChange={(checked) =>
+                  setGraphicsSettings({ shadows: checked })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Post-processing</Label>
+                <p className="text-muted-foreground text-xs">
+                  Effects & filters
+                </p>
+              </div>
+              <Switch
+                checked={graphicsSettings.postProcessing}
+                onCheckedChange={(checked) =>
+                  setGraphicsSettings({ postProcessing: checked })
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Quality Sliders */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm">Quality Settings</h4>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Texture Quality</Label>
+                <span className="text-muted-foreground text-xs">
+                  {Math.round(graphicsSettings.textureQuality * 100)}%
+                </span>
+              </div>
+              <Slider
+                max={1}
+                min={0.25}
+                onValueChange={(value) =>
+                  setGraphicsSettings({
+                    textureQuality: Array.isArray(value) ? value[0] : value,
+                  })
+                }
+                step={0.25}
+                value={[graphicsSettings.textureQuality]}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">LOD Distance</Label>
+                <span className="text-muted-foreground text-xs">
+                  {Math.round(graphicsSettings.lodDistance * 100)}%
+                </span>
+              </div>
+              <Slider
+                max={1}
+                min={0.4}
+                onValueChange={(value) =>
+                  setGraphicsSettings({
+                    lodDistance: Array.isArray(value) ? value[0] : value,
+                  })
+                }
+                step={0.1}
+                value={[graphicsSettings.lodDistance]}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Culling Distance</Label>
+                <span className="text-muted-foreground text-xs">
+                  {Math.round(graphicsSettings.cullingDistance * 100)}%
+                </span>
+              </div>
+              <Slider
+                max={1.5}
+                min={0.4}
+                onValueChange={(value) =>
+                  setGraphicsSettings({
+                    cullingDistance: Array.isArray(value) ? value[0] : value,
+                  })
+                }
+                step={0.1}
+                value={[graphicsSettings.cullingDistance]}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Particle Count</Label>
+                <span className="text-muted-foreground text-xs">
+                  {Math.round(graphicsSettings.particleCount * 100)}%
+                </span>
+              </div>
+              <Slider
+                max={1}
+                min={0.25}
+                onValueChange={(value) =>
+                  setGraphicsSettings({
+                    particleCount: Array.isArray(value) ? value[0] : value,
+                  })
+                }
+                step={0.25}
+                value={[graphicsSettings.particleCount]}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Environment Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Enable Skybox</Label>
+            <p className="text-muted-foreground text-sm">
+              Use a 360° skybox background instead of solid color
+            </p>
+          </div>
+          <Switch checked={skyboxEnabled} onCheckedChange={setSkyboxEnabled} />
+        </div>
+
+        {skyboxEnabled && (
+          <>
+            <div className="space-y-2">
+              <Label>Skybox Preset</Label>
+              <Select
+                onValueChange={(value) => {
+                  if (value) setSkyboxPreset(value);
+                }}
+                value={skyboxPreset}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SKYBOX_PRESETS).map(([key, preset]) => (
+                    <SelectItem key={key} value={key}>
+                      {preset.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Skybox Intensity</Label>
+                <span className="text-muted-foreground text-xs">
+                  {Math.round(skyboxIntensity * 100)}%
+                </span>
+              </div>
+              <Slider
+                max={2}
+                min={0.1}
+                onValueChange={(value) =>
+                  setSkyboxIntensity(Array.isArray(value) ? value[0] : value)
+                }
+                step={0.1}
+                value={[skyboxIntensity]}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Performance Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Show Performance Monitor</Label>
+            <p className="text-muted-foreground text-sm">
+              Display FPS, memory usage, and other metrics in the viewport
+            </p>
+          </div>
+          <Switch
+            checked={performanceMonitorEnabled}
+            onCheckedChange={setPerformanceMonitorEnabled}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Performance Regression on Move</Label>
+            <p className="text-muted-foreground text-sm">
+              Reduce graphics quality while moving the camera for smoother
+              navigation
+            </p>
+          </div>
+          <Switch
+            checked={useSceneStore.getState().performanceRegressionOnMove}
+            onCheckedChange={(checked) =>
+              useSceneStore.getState().setPerformanceRegressionOnMove(checked)
+            }
+          />
+        </div>
+      </div>
+
+      {/* Precision Section */}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Decimal Places</Label>
+          <Select
+            onValueChange={(value) =>
+              value && setPrecision(Number.parseInt(value, 10))
+            }
+            value={precision.toString()}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 decimal place</SelectItem>
+              <SelectItem value="2">2 decimal places</SelectItem>
+              <SelectItem value="3">3 decimal places</SelectItem>
+              <SelectItem value="4">4 decimal places</SelectItem>
+              <SelectItem value="5">5 decimal places</SelectItem>
+              <SelectItem value="6">6 decimal places</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-sm">
+            Controls precision for position, rotation, scale values and exports.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Tree node data structure
 interface TreeNode {
@@ -113,7 +490,6 @@ const TreeNodeComponent = memo(function TreeNodeComponent({
         {/* Expansion Toggle */}
         <div className="flex h-4 w-4 items-center justify-center">
           {hasChildren && (
-            // biome-ignore lint/a11y/useSemanticElements: <role="button" is required here (<button> cannot be used because hydrataion error)>
             <div
               className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-md font-medium text-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
               onClick={handleToggle}
@@ -136,7 +512,6 @@ const TreeNodeComponent = memo(function TreeNodeComponent({
         </div>
 
         {/* Visibility Toggle */}
-        {/** biome-ignore lint/a11y/useSemanticElements: <role="button" is required here (<button> cannot be used because hydrataion error)> */}
         <div
           className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-md font-medium text-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
           onClick={handleToggleVisibility}
@@ -206,6 +581,7 @@ export const SceneHierarchy = memo(function SceneHierarchy({
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
     new Set(["root"])
   );
+  const [activeTab, setActiveTab] = useState("hierarchy");
 
   // Build tree structure
   const treeData = useMemo(() => {
@@ -285,7 +661,11 @@ export const SceneHierarchy = memo(function SceneHierarchy({
     (nodeId: string) => {
       if (nodeId.startsWith("light_")) {
         selectLight(nodeId, false);
-      } else if (nodeId.startsWith("object_") || UUID_REGEX.test(nodeId)) {
+      } else if (
+        nodeId.startsWith("object_") ||
+        nodeId.startsWith("imported_") ||
+        UUID_REGEX.test(nodeId)
+      ) {
         selectObject(nodeId, false);
       }
     },
@@ -326,27 +706,52 @@ export const SceneHierarchy = memo(function SceneHierarchy({
   }
 
   return (
-    <div className={cn("overflow-hidden rounded-lg border", className)}>
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">
-        <div className="font-medium text-sm">Scene Hierarchy</div>
-        <Badge className="text-xs" variant="secondary">
-          {objects.length + lights.length}
-        </Badge>
-      </div>
+    <div
+      className={cn(
+        "flex h-[calc(100%-3.5rem)] flex-col overflow-hidden rounded-lg border",
+        className
+      )}
+    >
+      <Tabs
+        className="flex h-full flex-col"
+        onValueChange={setActiveTab}
+        value={activeTab}
+      >
+        <TabsList className="grid w-full shrink-0 grid-cols-2">
+          <TabsTrigger className="flex items-center gap-2" value="hierarchy">
+            <Package className="h-4 w-4" />
+            Scene
+            <Badge className="text-xs" variant="secondary">
+              {objects.length + lights.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger className="flex items-center gap-2" value="settings">
+            <SettingsIcon className="h-4 w-4" />
+            Settings
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Tree */}
-      <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent max-h-96 overflow-auto">
-        {(treeData.children || []).map((node) => (
-          <TreeNodeComponent
-            key={node.id}
-            node={node}
-            onSelect={handleSelect}
-            onToggle={handleToggle}
-            onToggleVisibility={handleToggleVisibility}
-          />
-        ))}
-      </div>
+        <TabsContent className="mt-0 flex-1 overflow-hidden" value="hierarchy">
+          {/* Tree */}
+          <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent h-full overflow-auto">
+            {(treeData.children || []).map((node) => (
+              <TreeNodeComponent
+                key={node.id}
+                node={node}
+                onSelect={handleSelect}
+                onToggle={handleToggle}
+                onToggleVisibility={handleToggleVisibility}
+              />
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent className="mt-0 flex-1 overflow-hidden" value="settings">
+          <div className="h-full overflow-auto">
+            <SettingsContent />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 });

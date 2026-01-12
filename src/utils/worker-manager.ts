@@ -11,6 +11,11 @@ interface WorkerTask {
 interface ParseResult {
   object: THREE.Object3DJSON; // THREE.Object3D JSON representation (full structure with metadata)
   boundingBox?: THREE.Box3JSON; // THREE.Box3 JSON representation
+  lights?: any[]; // Extracted lights from GLTF
+  cameras?: any[]; // Extracted cameras from GLTF
+  validation?: any; // GLTF extension validation results
+  animations?: any[]; // GLTF animations JSON
+  gltf?: any; // Full GLTF object for animation access
 }
 
 export class WorkerManager {
@@ -126,17 +131,40 @@ export class WorkerManager {
     const { GLTFLoader } = await import(
       "three/examples/jsm/loaders/GLTFLoader.js"
     );
+    const { DRACOLoader } = await import(
+      "three/examples/jsm/loaders/DRACOLoader.js"
+    );
+    const { KTX2Loader } = await import(
+      "three/examples/jsm/loaders/KTX2Loader.js"
+    );
     const { OBJLoader } = await import(
       "three/examples/jsm/loaders/OBJLoader.js"
     );
     const { FBXLoader } = await import(
       "three/examples/jsm/loaders/FBXLoader.js"
     );
+    const { validateGLTFExtensions, extractGLTFLights, extractGLTFCameras } =
+      await import("./gltf-extensions.js");
 
     switch (type) {
       case "gltf":
         return new Promise((resolve, reject) => {
           const loader = new GLTFLoader();
+
+          // Configure Draco loader for mesh compression
+          const dracoLoader = new DRACOLoader();
+          dracoLoader.setDecoderPath(
+            "https://www.gstatic.com/draco/versioned/decoders/1.5.6/"
+          );
+          loader.setDRACOLoader(dracoLoader);
+
+          // Configure KTX2 loader for texture compression
+          const ktx2Loader = new KTX2Loader();
+          ktx2Loader.setTranscoderPath(
+            "https://unpkg.com/three@0.182.0/examples/jsm/libs/basis/"
+          );
+          loader.setKTX2Loader(ktx2Loader);
+
           onProgress?.({ loaded: 25, total: 100, stage: "Parsing GLTF" });
           loader.parse(
             data as ArrayBuffer,
@@ -147,12 +175,33 @@ export class WorkerManager {
                 total: 100,
                 stage: "Optimizing model",
               });
+
+              // Log supported extensions for debugging
+              if (gltf.parser?.extensions) {
+                console.log("GLTF extensions:", gltf.parser.extensions);
+              }
+
+              // Validate extensions
+              const validation = validateGLTFExtensions(gltf);
+
+              // Extract lights and cameras
+              const lights = extractGLTFLights(gltf);
+              const cameras = extractGLTFCameras(gltf);
+
               // Optimize model like in worker
               optimizeModel(gltf.scene);
               // Return transferable data format
               resolve({
                 object: gltf.scene.toJSON(),
                 boundingBox: gltf.scene.userData.boundingBox?.toJSON(),
+                lights: lights.map((light) => light.toJSON()),
+                cameras: cameras.map((camera) => camera.toJSON()),
+                validation,
+                animations:
+                  gltf.animations?.map((anim: THREE.AnimationClip) =>
+                    anim.toJSON()
+                  ) || [],
+                gltf,
               });
             },
             (error) => reject(error)

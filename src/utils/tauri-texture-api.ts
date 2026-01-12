@@ -24,29 +24,6 @@ export interface TextureOperationResult {
   error?: string;
 }
 
-export interface ProcessedImageMetadata {
-  width: number;
-  height: number;
-  format: string;
-  sizeBytes: number;
-  base64Data: string;
-}
-
-export interface ImageOperation {
-  operationType: string; // "resize", "filter", "effect", "adjust"
-  // Resize options
-  width?: number;
-  height?: number;
-  // Filter options
-  filterName?: string;
-  // Effect options
-  effectName?: string;
-  // Adjustment options
-  brightness?: number; // -100 to 100
-  contrast?: number; // -100 to 100
-  saturation?: number; // -100 to 100
-}
-
 /**
  * Read an image file as base64 data URL
  */
@@ -256,59 +233,6 @@ export async function showTextureSaveDialog(options?: {
     });
   } catch (error) {
     console.error("Failed to show save dialog:", error);
-    throw error;
-  }
-}
-
-/**
- * Process an image with various operations using photon-rs
- */
-export async function processImage(
-  inputPath: string,
-  outputPath: string,
-  operations: ImageOperation[]
-): Promise<ProcessedImageMetadata> {
-  try {
-    return await invoke<ProcessedImageMetadata>("process_image", {
-      inputPath,
-      outputPath,
-      operations: operations.map((op) => ({
-        operation_type: op.operationType,
-        width: op.width,
-        height: op.height,
-        filter_name: op.filterName,
-        effect_name: op.effectName,
-        brightness: op.brightness,
-        contrast: op.contrast,
-        saturation: op.saturation,
-      })),
-    });
-  } catch (error) {
-    console.error("Failed to process image:", error);
-    throw error;
-  }
-}
-
-/**
- * Get list of supported filters from photon-rs
- */
-export async function getSupportedFilters(): Promise<string[]> {
-  try {
-    return await invoke<string[]>("get_supported_filters", {});
-  } catch (error) {
-    console.error("Failed to get supported filters:", error);
-    throw error;
-  }
-}
-
-/**
- * Get list of supported effects from photon-rs
- */
-export async function getSupportedEffects(): Promise<string[]> {
-  try {
-    return await invoke<string[]>("get_supported_effects", {});
-  } catch (error) {
-    console.error("Failed to get supported effects:", error);
     throw error;
   }
 }

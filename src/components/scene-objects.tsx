@@ -63,7 +63,9 @@ const InstancedObjects = memo(function InstancedObjects({
             continue;
         }
 
-        const material = materialCache.getStandardMaterial(color);
+        const material = materialCache.getStandardMaterial(color, {
+          side: geometryType === "plane" ? THREE.DoubleSide : THREE.FrontSide,
+        });
 
         groups.push({
           geometryType,

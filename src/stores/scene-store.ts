@@ -3,7 +3,6 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import {
   CAMERA_DEFAULTS,
-  DIRECTIONAL_LIGHT_DEFAULTS,
   GRID_DEFAULTS,
   OBJECT_DEFAULTS,
   PLACEMENT_DEFAULTS,
@@ -13,7 +12,10 @@ import {
 } from "~/lib/defaults";
 import { useMaterialStore } from "~/stores/material-store";
 import { clearPools } from "~/utils/geometry-pool";
-import { applyLightingPreset } from "~/utils/lighting-presets";
+import {
+  applyLightingPreset,
+  type LightingPresetId,
+} from "~/utils/lighting-presets";
 import { clearModelCache } from "~/utils/model-import";
 
 export type TransformTool = "select" | "move" | "rotate" | "scale";
@@ -70,6 +72,7 @@ export interface SceneObject {
   importedModel?: THREE.Object3D;
   initialScale?: number; // For imported models, stores the initial scaling factor
   modelid?: number; // SAMP model ID for export
+  animationController?: any; // Animation controller for GLTF models
 }
 
 export interface SceneState {
@@ -97,6 +100,11 @@ export interface SceneState {
   fogColor: string;
   fogNear: number;
   fogFar: number;
+
+  // Skybox settings
+  skyboxEnabled: boolean;
+  skyboxPreset: string;
+  skyboxIntensity: number;
 
   // Scene helpers
   axesVisible: boolean;
@@ -156,7 +164,7 @@ export interface SceneActions {
 
   // Lights
   setLightsVisible: (visible: boolean) => void;
-  applyLightingPreset: (presetId: string) => void;
+  applyLightingPreset: (presetId: LightingPresetId) => void;
 
   // Environment
   setBackgroundColor: (color: string) => void;
@@ -164,6 +172,11 @@ export interface SceneActions {
   setFogColor: (color: string) => void;
   setFogNear: (near: number) => void;
   setFogFar: (far: number) => void;
+
+  // Skybox
+  setSkyboxEnabled: (enabled: boolean) => void;
+  setSkyboxPreset: (preset: string) => void;
+  setSkyboxIntensity: (intensity: number) => void;
 
   // Scene helpers
   setAxesVisible: (visible: boolean) => void;
@@ -290,12 +303,9 @@ const createDefaultLight = (
 
 export const useSceneStore = create<SceneState & SceneActions>()(
   subscribeWithSelector((set, get) => ({
-    // Initial state
-    objects: [createDefaultObject("cube", [0, 0, 0])],
-    lights: [
-      createDefaultLight("ambient", [0, 0, 0]),
-      createDefaultLight("directional", [10, 10, 5]),
-    ],
+    // Initial state with basic studio lighting for new projects
+    objects: [],
+    lights: applyLightingPreset("studio"),
     selectedObjectIds: [],
     selectedLightIds: [],
     activeTool: TOOL_DEFAULTS.ACTIVE_TOOL,
@@ -309,11 +319,16 @@ export const useSceneStore = create<SceneState & SceneActions>()(
     transformDragging: UI_DEFAULTS.TRANSFORM_DRAGGING,
 
     // Environment defaults
-    backgroundColor: "#1e293b", // slate-800
+    backgroundColor: "#0a0a0a", // very dark gray (alternatives: "#1e293b")
     fogEnabled: false,
-    fogColor: "#1e293b",
+    fogColor: "#0a0a0a", // very dark gray (alternatives: "#1e293b")
     fogNear: 1,
     fogFar: 100,
+
+    // Skybox defaults
+    skyboxEnabled: true,
+    skyboxPreset: "cosmic",
+    skyboxIntensity: 1,
 
     // Scene helpers defaults
     axesVisible: true,
@@ -340,6 +355,9 @@ export const useSceneStore = create<SceneState & SceneActions>()(
           "standard",
           {
             color: newObject.color,
+            // Planes should be double-sided by default
+            side:
+              newObject.type === "plane" ? THREE.DoubleSide : THREE.FrontSide,
           }
         );
 
@@ -524,6 +542,17 @@ export const useSceneStore = create<SceneState & SceneActions>()(
           selectedLightIds: [], // Clear light selection when selecting object
         };
       });
+
+      // Auto-select material for the selected object if it has one
+      const object = get().objects.find((obj) => obj.id === id);
+      if (object?.materialId) {
+        const materialStore = useMaterialStore.getState();
+        materialStore.selectMaterial(object.materialId);
+      } else {
+        // Clear material selection if object has no material
+        const materialStore = useMaterialStore.getState();
+        materialStore.selectMaterial(null);
+      }
     },
 
     selectLight: (id, multiSelect = false) => {
@@ -549,10 +578,17 @@ export const useSceneStore = create<SceneState & SceneActions>()(
           selectedObjectIds: [], // Clear object selection when selecting light
         };
       });
+
+      // Clear material selection when selecting light
+      const materialStore = useMaterialStore.getState();
+      materialStore.selectMaterial(null);
     },
 
     clearSelection: () => {
       set({ selectedObjectIds: [], selectedLightIds: [] });
+      // Also clear material selection
+      const materialStore = useMaterialStore.getState();
+      materialStore.selectMaterial(null);
     },
 
     selectAll: () => {
@@ -560,6 +596,10 @@ export const useSceneStore = create<SceneState & SceneActions>()(
         selectedObjectIds: state.objects.map((obj) => obj.id),
         selectedLightIds: [], // Clear light selection when selecting all objects
       }));
+
+      // Clear material selection when selecting all objects
+      const materialStore = useMaterialStore.getState();
+      materialStore.selectMaterial(null);
     },
 
     setActiveTool: (tool) => {
@@ -635,6 +675,20 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       get().markSceneModified();
     },
 
+    // Skybox actions
+    setSkyboxEnabled: (enabled) => {
+      set({ skyboxEnabled: enabled });
+      get().markSceneModified();
+    },
+    setSkyboxPreset: (preset) => {
+      set({ skyboxPreset: preset });
+      get().markSceneModified();
+    },
+    setSkyboxIntensity: (intensity) => {
+      set({ skyboxIntensity: intensity });
+      get().markSceneModified();
+    },
+
     // Scene helpers actions
     setAxesVisible: (visible) => {
       set({ axesVisible: visible });
@@ -653,16 +707,14 @@ export const useSceneStore = create<SceneState & SceneActions>()(
     clearScene: () => {
       set({
         objects: [],
-        lights: [
-          createDefaultLight("ambient", [0, 0, 0]),
-          createDefaultLight(
-            "directional",
-            DIRECTIONAL_LIGHT_DEFAULTS.POSITION
-          ),
-        ],
+        lights: [],
         selectedObjectIds: [],
         selectedLightIds: [],
       });
+
+      // Also clear material selection
+      const materialStore = useMaterialStore.getState();
+      materialStore.selectMaterial(null);
 
       get().markSceneModified();
     },

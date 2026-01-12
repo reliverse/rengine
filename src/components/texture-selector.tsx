@@ -55,7 +55,6 @@ export function TextureSelector({
   const {
     getTextureById,
     setFilterSearch,
-    setFilterType,
     selectTexture,
     createProceduralTexture,
   } = useTextureStore();
@@ -107,13 +106,6 @@ export function TextureSelector({
     [setFilterSearch]
   );
 
-  const _handleTypeFilterChange = useCallback(
-    (type: string) => {
-      setFilterType(type === "all" ? "all" : type);
-    },
-    [setFilterType]
-  );
-
   const proceduralTypes = [
     { id: "color", name: "Color", description: "Solid color texture" },
     {
@@ -128,7 +120,7 @@ export function TextureSelector({
 
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger asChild>
+      <DialogTrigger>
         {children || (
           <Button
             className={cn("flex items-center gap-2", className)}

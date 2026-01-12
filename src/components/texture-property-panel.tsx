@@ -28,6 +28,7 @@ import { Separator } from "~/components/ui/separator";
 import { Slider } from "~/components/ui/slider";
 import { Switch } from "~/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { cn } from "~/lib/utils";
 import { useSelectedTexture, useTextureStore } from "~/stores/texture-store";
 
 interface TexturePropertyPanelProps {
@@ -213,7 +214,7 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
               <div className="space-y-2">
                 <Label htmlFor="texture-type">Type</Label>
                 <Select
-                  onValueChange={handleTypeChange}
+                  onValueChange={(value) => value && handleTypeChange(value)}
                   value={selectedTexture.type}
                 >
                   <SelectTrigger>
@@ -251,10 +252,16 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Select onValueChange={handleExport}>
+                  <Select
+                    onValueChange={(value) =>
+                      handleExport(value as "png" | "jpg" | "webp")
+                    }
+                  >
                     <SelectTrigger className="w-32">
-                      <Download className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="Export" />
+                      <div className="flex items-center">
+                        <Download className="mr-2 h-4 w-4" />
+                        <span>Export</span>
+                      </div>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="png">PNG</SelectItem>
@@ -275,7 +282,10 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                     <Label>U Wrap</Label>
                     <Select
                       onValueChange={(value) =>
-                        handleSettingsChange({ wrapS: Number.parseInt(value) })
+                        value &&
+                        handleSettingsChange({
+                          wrapS: Number.parseInt(value, 10),
+                        })
                       }
                       value={selectedTexture.settings.wrapS.toString()}
                     >
@@ -298,7 +308,10 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                     <Label>V Wrap</Label>
                     <Select
                       onValueChange={(value) =>
-                        handleSettingsChange({ wrapT: Number.parseInt(value) })
+                        value &&
+                        handleSettingsChange({
+                          wrapT: Number.parseInt(value, 10),
+                        })
                       }
                       value={selectedTexture.settings.wrapT.toString()}
                     >
@@ -329,8 +342,9 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                     <Label>Mag Filter</Label>
                     <Select
                       onValueChange={(value) =>
+                        value &&
                         handleSettingsChange({
-                          magFilter: Number.parseInt(value),
+                          magFilter: Number.parseInt(value, 10),
                         })
                       }
                       value={selectedTexture.settings.magFilter.toString()}
@@ -353,8 +367,9 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                     <Label>Min Filter</Label>
                     <Select
                       onValueChange={(value) =>
+                        value &&
                         handleSettingsChange({
-                          minFilter: Number.parseInt(value),
+                          minFilter: Number.parseInt(value, 10),
                         })
                       }
                       value={selectedTexture.settings.minFilter.toString()}
@@ -393,8 +408,12 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                       className="w-full"
                       max={16}
                       min={1}
-                      onValueChange={([value]) =>
-                        handleSettingsChange({ anisotropy: value })
+                      onValueChange={(values) =>
+                        handleSettingsChange({
+                          anisotropy: Array.isArray(values)
+                            ? values[0]
+                            : values,
+                        })
                       }
                       step={1}
                       value={[selectedTexture.settings.anisotropy]}
@@ -435,7 +454,9 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                     <img
                       alt={selectedTexture.name}
                       className="h-full w-full object-contain"
+                      height={256}
                       src={selectedTexture.thumbnail}
+                      width={256}
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -535,8 +556,8 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                   <div>
                     <Label className="text-muted-foreground">Tags</Label>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {selectedTexture.metadata.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary">
+                      {selectedTexture.metadata.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary">
                           {tag}
                         </Badge>
                       ))}
@@ -556,8 +577,8 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                           <div className="text-red-600">
                             <h5 className="font-medium">Errors:</h5>
                             <ul className="list-inside list-disc text-sm">
-                              {validation.errors.map((error, index) => (
-                                <li key={index}>{error}</li>
+                              {validation.errors.map((error) => (
+                                <li key={error}>{error}</li>
                               ))}
                             </ul>
                           </div>
@@ -567,8 +588,8 @@ export function TexturePropertyPanel({ className }: TexturePropertyPanelProps) {
                           <div className="text-yellow-600">
                             <h5 className="font-medium">Warnings:</h5>
                             <ul className="list-inside list-disc text-sm">
-                              {validation.warnings.map((warning, index) => (
-                                <li key={index}>{warning}</li>
+                              {validation.warnings.map((warning) => (
+                                <li key={warning}>{warning}</li>
                               ))}
                             </ul>
                           </div>

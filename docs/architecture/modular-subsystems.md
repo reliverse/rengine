@@ -9,6 +9,7 @@ Rengine implements a modular architecture where different subsystems are organiz
 ### Frontend Subsystems
 
 #### Scene Management System
+
 The scene management system handles all 3D scene operations using Zustand for state management:
 
 ```typescript
@@ -23,12 +24,14 @@ interface SceneState {
 ```
 
 **Key Features:**
+
 - Real-time 3D object manipulation (move, rotate, scale)
 - Multi-object selection with transform gizmos
 - Grid-based positioning with snap-to-grid
 - Scene serialization and persistence
 
 #### Rendering System
+
 Built on React Three Fiber for declarative 3D rendering:
 
 ```typescript
@@ -42,18 +45,20 @@ Built on React Three Fiber for declarative 3D rendering:
 ```
 
 **Components:**
+
 - **SceneCanvas**: Main 3D viewport with orbit controls
 - **SceneObjectMesh**: Individual 3D object rendering
 - **TransformControls**: Interactive transform gizmos
 - **PlacementPreview**: Real-time object placement preview
 
 #### UI System
+
 Modern React-based interface using Shadcn/ui components:
 
 ```typescript
 // Component hierarchy
-<UnifiedSidebar context="scene">     {/* Scene hierarchy */}
-<UnifiedSidebar context="tools">     {/* Property panels */}
+<RightSidebar context="scene">     {/* Scene hierarchy */}
+<RightSidebar context="tools">     {/* Property panels */}
 <Toolbar />                         {/* Main toolbar */}
 <SceneCanvas />                     {/* 3D viewport */}
 ```
@@ -61,6 +66,7 @@ Modern React-based interface using Shadcn/ui components:
 ### Backend Subsystems
 
 #### File System Operations
+
 Native file operations via Tauri Rust backend:
 
 ```rust
@@ -76,6 +82,7 @@ async fn write_file(file_path: String, content: String) -> Result<(), String> {
 ```
 
 **Features:**
+
 - Scene file save/load operations
 - 3D model import (GLTF, OBJ, FBX)
 - Cross-platform file dialogs
@@ -84,11 +91,13 @@ async fn write_file(file_path: String, content: String) -> Result<(), String> {
 ### Subsystem Communication
 
 #### State Flow
+
 ```
 User Input → React Event Handlers → Zustand Actions → Three.js Updates → UI Re-render
 ```
 
 #### Data Flow
+
 ```
 File Load → Tauri Command → Frontend State Update → 3D Scene Update → Visual Feedback
 ```
@@ -96,6 +105,7 @@ File Load → Tauri Command → Frontend State Update → 3D Scene Update → Vi
 ## Module Organization
 
 ### Directory Structure
+
 ```
 src/
 ├── components/     # UI components and 3D rendering
@@ -109,16 +119,19 @@ src/
 ### Separation of Concerns
 
 #### Presentation Layer (React Components)
+
 - Pure UI components
 - Event handling and user interactions
 - Visual feedback and animations
 
 #### Business Logic Layer (Zustand Stores)
+
 - Scene state management
 - Object manipulation logic
 - Lighting and material calculations
 
 #### Infrastructure Layer (Tauri + Utilities)
+
 - File system operations
 - 3D model parsing and validation
 - Cross-platform compatibility
@@ -126,16 +139,19 @@ src/
 ## Benefits
 
 ### Maintainability
+
 - Clear separation between UI, business logic, and infrastructure
 - Independent testing of subsystems
 - Easier debugging with isolated concerns
 
 ### Extensibility
+
 - Plugin architecture foundation
 - Easy addition of new tools and features
 - Modular lighting and material systems
 
 ### Performance
+
 - Efficient state updates with Zustand selectors
 - Optimized 3D rendering with React Three Fiber
 - Lazy loading of heavy components

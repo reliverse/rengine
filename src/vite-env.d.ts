@@ -5,4 +5,8 @@ import "@react-three/fiber";
 
 declare global {
   // React Three Fiber automatically extends JSX.IntrinsicElements
+
+  interface Window {
+    __TAURI__?: any;
+  }
 }

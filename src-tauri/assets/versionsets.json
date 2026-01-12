@@ -1,0 +1,112 @@
+{
+  "version_sets": [
+    {
+      "name": "gta3",
+      "display_name": "GTA III",
+      "icon_name": "gta3",
+      "platforms": [
+        {
+          "platform": "PC",
+          "rw_version": "3.1.0.1",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        },
+        {
+          "platform": "MOBILE",
+          "rw_version": "3.1.0.1",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        }
+      ]
+    },
+    {
+      "name": "vc",
+      "display_name": "Vice City",
+      "icon_name": "vc",
+      "platforms": [
+        {
+          "platform": "PC",
+          "rw_version": "3.3.0.2",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        },
+        {
+          "platform": "MOBILE",
+          "rw_version": "3.3.0.2",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        }
+      ]
+    },
+    {
+      "name": "sa",
+      "display_name": "San Andreas",
+      "icon_name": "sa",
+      "platforms": [
+        {
+          "platform": "PC",
+          "rw_version": "3.6.0.3",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        },
+        {
+          "platform": "PC",
+          "rw_version": "3.4.0.3",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        },
+        {
+          "platform": "PS2",
+          "rw_version": "3.6.0.3",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        },
+        {
+          "platform": "XBOX",
+          "rw_version": "3.6.0.3",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        },
+        {
+          "platform": "MOBILE",
+          "rw_version": "3.6.0.3",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        }
+      ]
+    },
+    {
+      "name": "lcs",
+      "display_name": "Liberty City Stories",
+      "icon_name": "lcs",
+      "platforms": [
+        {
+          "platform": "PSP",
+          "rw_version": "3.5.0.0",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        },
+        {
+          "platform": "PS2",
+          "rw_version": "3.5.0.0",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        }
+      ]
+    },
+    {
+      "name": "vcs",
+      "display_name": "Vice City Stories",
+      "icon_name": "vcs",
+      "platforms": [
+        {
+          "platform": "PSP",
+          "rw_version": "3.5.0.2",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        },
+        {
+          "platform": "PS2",
+          "rw_version": "3.5.0.2",
+          "data_types": ["DFF", "TXD", "COL", "IPL", "IDE"]
+        }
+      ]
+    }
+  ],
+  "platform_info": {
+    "PC": ["DFF", "TXD", "COL", "IPL", "IDE", "IFP"],
+    "PS2": ["DFF", "TXD", "COL", "IPL", "IDE"],
+    "XBOX": ["DFF", "TXD", "COL", "IPL", "IDE"],
+    "PSP": ["DFF", "TXD", "COL", "IPL", "IDE"],
+    "MOBILE": ["DFF", "TXD", "COL", "IPL", "IDE"],
+    "GAMECUBE": ["DFF", "TXD", "COL", "IPL", "IDE"]
+  }
+}

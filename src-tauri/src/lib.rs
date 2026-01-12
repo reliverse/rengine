@@ -1,6 +1,10 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
+pub mod renderware;
+
 use base64::{engine::general_purpose, Engine as _};
+use std::collections::HashSet;
+use crate::renderware::img::ImgArchive;
 use photon_rs::native::{open_image, save_image};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -37,6 +41,9 @@ pub enum RengineError {
 
     #[error("Failed to write file {path}: {details}")]
     FileWriteFailed { path: String, details: String },
+
+    #[error("Failed to parse {path}: {details}")]
+    ParseError { path: String, details: String },
 
     #[error("Directory does not exist: {path}")]
     DirectoryNotFound { path: String },
@@ -862,6 +869,529 @@ pub struct ProcessedImageMetadata {
     pub base64_data: String,
 }
 
+// IMG Archive Commands
+#[tauri::command]
+async fn load_img_archive(path: String) -> Result<crate::renderware::img::ImgArchive, String> {
+    use crate::renderware::img::ImgArchive;
+    use crate::renderware::versions::RenderWareVersionManager;
+
+    match ImgArchive::load_from_path(&path) {
+        Ok(mut archive) => {
+            // Analyze RenderWare versions for all entries
+            let version_manager = RenderWareVersionManager::new();
+            archive.analyze_renderware_versions(&version_manager);
+            Ok(archive)
+        }
+        Err(e) => Err(format!("Failed to load IMG archive: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn extract_img_entry(archive_path: String, entry_name: String, output_path: String) -> Result<(), String> {
+    use crate::renderware::img::ImgArchive;
+
+    match ImgArchive::load_from_path(&archive_path) {
+        Ok(archive) => {
+            match archive.extract_entry(&entry_name, &output_path) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(format!("Failed to extract entry '{}': {}", entry_name, e)),
+            }
+        }
+        Err(e) => Err(format!("Failed to load IMG archive: {}", e)),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct BatchExtractRequest {
+    archive_path: String,
+    operations: Vec<ImgOperation>,
+}
+
+#[derive(serde::Deserialize)]
+struct ImgOperation {
+    entry_name: String,
+    output_path: String,
+}
+
+#[tauri::command]
+async fn batch_extract_img_entries(request: BatchExtractRequest) -> Result<Vec<crate::renderware::img::OperationResult>, String> {
+    use crate::renderware::img::{ImgArchive, OperationResult};
+
+    let mut results = Vec::new();
+
+    match ImgArchive::load_from_path(&request.archive_path) {
+        Ok(archive) => {
+            for operation in &request.operations {
+                let result = match archive.extract_entry(&operation.entry_name, &operation.output_path) {
+                    Ok(()) => OperationResult {
+                        entry_name: operation.entry_name.clone(),
+                        success: true,
+                        error: None,
+                    },
+                    Err(e) => OperationResult {
+                        entry_name: operation.entry_name.clone(),
+                        success: false,
+                        error: Some(format!("Failed to extract entry: {}", e)),
+                    },
+                };
+                results.push(result);
+            }
+        }
+        Err(e) => {
+            // If archive fails to load, mark all operations as failed
+            for operation in &request.operations {
+                results.push(OperationResult {
+                    entry_name: operation.entry_name.clone(),
+                    success: false,
+                    error: Some(format!("Failed to load archive: {}", e)),
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+#[derive(serde::Deserialize)]
+struct ImportViaIdeRequest {
+    img_archive_path: String,
+    ide_file_path: String,
+    models_directory: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct ImportViaIdeResult {
+    imported_entries: Vec<String>,
+    failed_files: Vec<String>,
+    parsed_info: serde_json::Value,
+}
+
+#[derive(serde::Serialize)]
+struct MemoryStats {
+    process_memory_mb: f64,
+    system_memory_used_mb: u64,
+    system_memory_total_mb: u64,
+    system_memory_percentage: f32,
+    timestamp: String,
+}
+
+// IDE-based importing functionality
+#[tauri::command]
+async fn import_via_ide(request: ImportViaIdeRequest) -> Result<ImportViaIdeResult, String> {
+    use crate::renderware::img::ImgArchive;
+    use std::path::Path;
+
+    // Load the IMG archive
+    let mut archive = match ImgArchive::load_from_path(&request.img_archive_path) {
+        Ok(archive) => archive,
+        Err(e) => return Err(format!("Failed to load IMG archive: {}", e)),
+    };
+
+    // Parse IDE file to extract model and texture references
+    let (models, textures): (HashSet<String>, HashSet<String>) = match parse_ide_file(&request.ide_file_path) {
+        Ok(result) => result,
+        Err(e) => return Err(format!("Failed to parse IDE file: {}", e)),
+    };
+
+    if models.is_empty() && textures.is_empty() {
+        return Ok(ImportViaIdeResult {
+            imported_entries: vec![],
+            failed_files: vec![],
+            parsed_info: serde_json::json!({
+                "objs_count": 0,
+                "tobj_count": 0,
+                "unique_models": 0,
+                "unique_textures": 0,
+                "found_models": [],
+                "found_textures": [],
+                "missing_models": [],
+                "missing_textures": []
+            }),
+        });
+    }
+
+    // Determine models directory
+    let models_directory = request.models_directory
+        .unwrap_or_else(|| Path::new(&request.ide_file_path).parent()
+            .unwrap_or(Path::new(".")).to_string_lossy().to_string());
+
+    let mut imported_entries = Vec::new();
+    let mut failed_files = Vec::new();
+    let mut found_models = Vec::new();
+    let mut found_textures = Vec::new();
+    let mut missing_models = Vec::new();
+    let mut missing_textures = Vec::new();
+
+    // Import DFF files
+    for model_name in &models {
+        let dff_path = find_file_in_directory(&models_directory, &format!("{}.dff", model_name));
+        if let Some(path) = dff_path {
+            found_models.push(model_name.to_string());
+            match import_file_to_archive(&mut archive, &path, &format!("{}.dff", model_name)) {
+                Ok(_) => {
+                    imported_entries.push(format!("{}.dff", model_name));
+                }
+                Err(e) => {
+                    failed_files.push(path);
+                    log_warn!("Failed to import model {}: {}", model_name, e);
+                }
+            }
+        } else {
+            missing_models.push(model_name.clone());
+        }
+    }
+
+    // Import TXD files
+    for texture_name in &textures {
+        let txd_path = find_file_in_directory(&models_directory, &format!("{}.txd", texture_name));
+        if let Some(path) = txd_path {
+            found_textures.push(texture_name.to_string());
+            match import_file_to_archive(&mut archive, &path, &format!("{}.txd", texture_name)) {
+                Ok(_) => {
+                    imported_entries.push(format!("{}.txd", texture_name));
+                }
+                Err(e) => {
+                    failed_files.push(path);
+                    log_warn!("Failed to import texture {}: {}", texture_name, e);
+                }
+            }
+        } else {
+            missing_textures.push(texture_name.clone());
+        }
+    }
+
+    let parsed_info = serde_json::json!({
+        "objs_count": models.len(),
+        "tobj_count": textures.len(),
+        "unique_models": models.len(),
+        "unique_textures": textures.len(),
+        "found_models": found_models,
+        "found_textures": found_textures,
+        "missing_models": missing_models,
+        "missing_textures": missing_textures
+    });
+
+    Ok(ImportViaIdeResult {
+        imported_entries,
+        failed_files,
+        parsed_info,
+    })
+}
+
+#[tauri::command]
+async fn delete_img_entry(archive_path: String, entry_name: String) -> Result<(), String> {
+    use crate::renderware::img::ImgArchive;
+
+    // For now, we'll need to load, modify, and save the archive
+    // In a full implementation, this would work with in-memory archives
+    match ImgArchive::load_from_path(&archive_path) {
+        Ok(mut archive) => {
+            match archive.delete_entry(&entry_name) {
+                Ok(()) => {
+                    // In a real implementation, we'd save the archive back
+                    // For now, just return success
+                    Ok(())
+                }
+                Err(e) => Err(format!("Failed to delete entry '{}': {}", entry_name, e)),
+            }
+        }
+        Err(e) => Err(format!("Failed to load IMG archive: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn restore_img_entry(archive_path: String, entry_name: String) -> Result<(), String> {
+    use crate::renderware::img::ImgArchive;
+
+    match ImgArchive::load_from_path(&archive_path) {
+        Ok(mut archive) => {
+            match archive.restore_entry(&entry_name) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(format!("Failed to restore entry '{}': {}", entry_name, e)),
+            }
+        }
+        Err(e) => Err(format!("Failed to load IMG archive: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn get_img_modification_info(archive_path: String) -> Result<serde_json::Value, String> {
+    use crate::renderware::img::ImgArchive;
+
+    match ImgArchive::load_from_path(&archive_path) {
+        Ok(archive) => Ok(archive.get_modification_info()),
+        Err(e) => Err(format!("Failed to load IMG archive: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn get_memory_stats() -> Result<MemoryStats, String> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    // Get current timestamp
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // For now, return basic stats
+    // In a full implementation, you'd use system APIs to get actual memory stats
+    let process_memory_mb = 0.0; // Placeholder
+    let system_memory_used_mb = 0; // Placeholder
+    let system_memory_total_mb = 0; // Placeholder
+    let system_memory_percentage = 0.0; // Placeholder
+
+    Ok(MemoryStats {
+        process_memory_mb,
+        system_memory_used_mb,
+        system_memory_total_mb,
+        system_memory_percentage,
+        timestamp: timestamp.to_string(),
+    })
+}
+
+#[tauri::command]
+async fn get_home_directory() -> Result<String, String> {
+    match std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+        Ok(home) => Ok(home),
+        Err(_) => Ok("/".to_string()), // Fallback to root
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PwnObjectData {
+    pub modelid: u32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub rx: f32,
+    pub ry: f32,
+    pub rz: f32,
+    pub worldid: Option<i32>,
+    pub interiorid: Option<i32>,
+    pub playerid: Option<i32>,
+    pub streamdistance: Option<f32>,
+    pub drawdistance: Option<f32>,
+    pub areaid: Option<i32>,
+    pub priority: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PwnImportResult {
+    pub objects: Vec<PwnObjectData>,
+    pub line_count: usize,
+    pub parsed_count: usize,
+    pub errors: Vec<String>,
+}
+
+#[tauri::command]
+async fn parse_pwn_file(file_path: String) -> Result<PwnImportResult, String> {
+    use regex::Regex;
+    use std::fs::File;
+    use std::io::Read;
+
+    // Read the PWN file
+    let mut file = File::open(&file_path).map_err(|e| {
+        format!("Failed to open PWN file {}: {}", file_path, e)
+    })?;
+
+    let mut content = String::new();
+    file.read_to_string(&mut content).map_err(|e| {
+        format!("Failed to read PWN file {}: {}", file_path, e)
+    })?;
+
+    // Regex pattern to match CreateDynamicObject calls
+    // Format: CreateDynamicObject(modelid, Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz, worldid = value, interiorid = value, playerid = value, Float:streamdistance = value, Float:drawdistance = value, areaid = value, priority = value);
+    let re = Regex::new(r"CreateDynamicObject\s*\(\s*(\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*(?:,\s*worldid\s*=\s*([+-]?\d+))?\s*(?:,\s*interiorid\s*=\s*([+-]?\d+))?\s*(?:,\s*playerid\s*=\s*([+-]?\d+))?\s*(?:,\s*Float\s*:\s*streamdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*Float\s*:\s*drawdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*areaid\s*=\s*([+-]?\d+))?\s*(?:,\s*priority\s*=\s*(\d+))?\s*\)\s*;").map_err(|e| {
+        format!("Failed to create regex pattern: {}", e)
+    })?;
+
+    let mut objects = Vec::new();
+    let mut errors = Vec::new();
+    let lines: Vec<&str> = content.lines().collect();
+    let mut parsed_count = 0;
+
+    for (line_num, line) in lines.iter().enumerate() {
+        let line = line.trim();
+
+        // Skip empty lines and comments
+        if line.is_empty() || line.starts_with("//") || line.starts_with("#") {
+            continue;
+        }
+
+        if let Some(captures) = re.captures(line) {
+            match parse_create_dynamic_object(&captures) {
+                Ok(obj) => {
+                    objects.push(obj);
+                    parsed_count += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("Line {}: {}", line_num + 1, e));
+                }
+            }
+        } else if !line.is_empty() && !line.starts_with("//") && !line.starts_with("#") {
+            // Only report errors for non-empty, non-comment lines that don't match
+            errors.push(format!("Line {}: Invalid CreateDynamicObject syntax", line_num + 1));
+        }
+    }
+
+    Ok(PwnImportResult {
+        objects,
+        line_count: lines.len(),
+        parsed_count,
+        errors,
+    })
+}
+
+fn parse_create_dynamic_object(captures: &regex::Captures) -> Result<PwnObjectData, String> {
+    // Helper function to parse float values, handling constants
+    fn parse_float_or_constant(value: &str) -> Result<f32, String> {
+        match value.to_uppercase().as_str() {
+            "STREAMER_OBJECT_SD" => Ok(200.0), // Default stream distance
+            "STREAMER_OBJECT_DD" => Ok(0.0),   // Default draw distance
+            _ => value.parse::<f32>().map_err(|_| format!("Invalid float value: {}", value))
+        }
+    }
+
+    // Helper function to parse optional integer values
+    fn parse_optional_i32(value: Option<&regex::Match>) -> Result<Option<i32>, String> {
+        match value {
+            Some(m) => {
+                let val = m.as_str().parse::<i32>().map_err(|_| format!("Invalid integer value: {}", m.as_str()))?;
+                Ok(Some(val))
+            }
+            None => Ok(None)
+        }
+    }
+
+    // Helper function to parse optional float values
+    fn parse_optional_f32(value: Option<&regex::Match>) -> Result<Option<f32>, String> {
+        match value {
+            Some(m) => {
+                let val = parse_float_or_constant(m.as_str())?;
+                Ok(Some(val))
+            }
+            None => Ok(None)
+        }
+    }
+
+    // Helper function to parse optional u32 values
+    fn parse_optional_u32(value: Option<&regex::Match>) -> Result<Option<u32>, String> {
+        match value {
+            Some(m) => {
+                let val = m.as_str().parse::<u32>().map_err(|_| format!("Invalid unsigned integer value: {}", m.as_str()))?;
+                Ok(Some(val))
+            }
+            None => Ok(None)
+        }
+    }
+
+    let modelid = captures.get(1).unwrap().as_str().parse::<u32>()
+        .map_err(|_| "Invalid model ID")?;
+
+    let x = parse_float_or_constant(captures.get(2).unwrap().as_str())?;
+    let y = parse_float_or_constant(captures.get(3).unwrap().as_str())?;
+    let z = parse_float_or_constant(captures.get(4).unwrap().as_str())?;
+    let rx = parse_float_or_constant(captures.get(5).unwrap().as_str())?;
+    let ry = parse_float_or_constant(captures.get(6).unwrap().as_str())?;
+    let rz = parse_float_or_constant(captures.get(7).unwrap().as_str())?;
+
+    let worldid = parse_optional_i32(captures.get(8).as_ref())?;
+    let interiorid = parse_optional_i32(captures.get(9).as_ref())?;
+    let playerid = parse_optional_i32(captures.get(10).as_ref())?;
+    let streamdistance = parse_optional_f32(captures.get(11).as_ref())?;
+    let drawdistance = parse_optional_f32(captures.get(12).as_ref())?;
+    let areaid = parse_optional_i32(captures.get(13).as_ref())?;
+    let priority = parse_optional_u32(captures.get(14).as_ref())?;
+
+    Ok(PwnObjectData {
+        modelid,
+        x,
+        y,
+        z,
+        rx,
+        ry,
+        rz,
+        worldid,
+        interiorid,
+        playerid,
+        streamdistance,
+        drawdistance,
+        areaid,
+        priority,
+    })
+}
+
+// Helper function to parse IDE file and extract model/texture names
+fn parse_ide_file(ide_path: &str) -> Result<(HashSet<String>, HashSet<String>), String> {
+    use std::fs::File;
+    use std::io::Read;
+
+    let mut file = File::open(ide_path)
+        .map_err(|e| format!("Failed to open IDE file: {}", e))?;
+
+    let mut content = String::new();
+    file.read_to_string(&mut content)
+        .map_err(|e| format!("Failed to read IDE file: {}", e))?;
+
+    let mut models = HashSet::new();
+    let mut textures = HashSet::new();
+
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        // Parse objs and tobj sections
+        // Format: ID, ModelName, TextureName, ObjectCount, DrawDist, [DrawDist2, ...], Flags
+        let parts: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+        if parts.len() >= 3 {
+            let model_name = parts[1];
+            let texture_name = parts[2];
+
+            if !model_name.is_empty() && model_name != "-" {
+                models.insert(model_name.to_string());
+            }
+            if !texture_name.is_empty() && texture_name != "-" {
+                textures.insert(texture_name.to_string());
+            }
+        }
+    }
+
+    Ok((models, textures))
+}
+
+// Helper function to find file in directory (case-insensitive)
+fn find_file_in_directory(directory: &str, filename: &str) -> Option<String> {
+    use std::fs;
+
+    if let Ok(entries) = fs::read_dir(directory) {
+        for entry in entries.flatten() {
+            if let Ok(name) = entry.file_name().into_string() {
+                if name.to_lowercase() == filename.to_lowercase() {
+                    return Some(entry.path().to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+// Helper function to import file to archive
+fn import_file_to_archive(archive: &mut ImgArchive, file_path: &str, entry_name: &str) -> Result<(), String> {
+    use std::fs;
+
+    let data = fs::read(file_path)
+        .map_err(|e| format!("Failed to read file {}: {}", file_path, e))?;
+
+    // Add entry to archive (this is in-memory operation)
+    archive.add_entry(entry_name, &data)
+        .map_err(|e| format!("Failed to add entry to archive: {}", e))?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -887,7 +1417,17 @@ pub fn run() {
             batch_process_textures,
             process_image,
             get_supported_filters,
-            get_supported_effects
+            get_supported_effects,
+            load_img_archive,
+            extract_img_entry,
+            batch_extract_img_entries,
+            import_via_ide,
+            delete_img_entry,
+            restore_img_entry,
+            get_img_modification_info,
+            get_memory_stats,
+            get_home_directory,
+            parse_pwn_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

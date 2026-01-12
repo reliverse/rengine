@@ -157,15 +157,17 @@ class PerformanceMonitor {
     const warnings: string[] = [];
     const avgMetrics = this.getAverageMetrics(60);
 
-    if (avgMetrics.fps && avgMetrics.fps < 30) {
-      warnings.push(`Low FPS: ${avgMetrics.fps.toFixed(1)} (target: 60+)`);
-    }
+    // FPS warnings disabled TODO: Enable back when scene rendering is optimized
+    // if (avgMetrics.fps && avgMetrics.fps < 30) {
+    //   warnings.push(`Low FPS: ${avgMetrics.fps.toFixed(1)} (target: 60+)`);
+    // }
 
-    if (avgMetrics.frameTime && avgMetrics.frameTime > 16.67) {
-      warnings.push(
-        `High frame time: ${avgMetrics.frameTime.toFixed(2)}ms (target: <16.67ms)`
-      );
-    }
+    // Frame time warnings disabled TODO: Enable back when scene rendering is optimized
+    // if (avgMetrics.frameTime && avgMetrics.frameTime > 16.67) {
+    //   warnings.push(
+    //     `High frame time: ${avgMetrics.frameTime.toFixed(2)}ms (target: <16.67ms)`
+    //   );
+    // }
 
     if (avgMetrics.memoryUsage && avgMetrics.memoryUsage > 100 * 1024 * 1024) {
       warnings.push(

@@ -6,6 +6,7 @@ import { performanceMonitor } from "~/utils/performance-monitor";
 import { PlacementPreview } from "../placement-preview";
 import { SceneLights } from "../scene-lights";
 import { SceneObjects } from "../scene-objects";
+import { Skybox } from "../skybox";
 import { MouseInteraction } from "./mouse-interaction";
 
 export function SceneRenderer({
@@ -21,13 +22,24 @@ export function SceneRenderer({
     performanceMonitor.setRenderer(gl);
   }, [gl]);
 
-  // Update performance monitor every frame
+  // Update performance monitor and animations every frame
   useFrame(() => {
     performanceMonitor.update();
+
+    // Update animations for all objects
+    const objects = useSceneStore.getState().objects;
+    for (const object of objects) {
+      if (object.animationController) {
+        object.animationController.update();
+      }
+    }
   });
 
   return (
     <>
+      {/* Skybox */}
+      <Skybox />
+
       {/* Scene Lighting */}
       <SceneLights />
 
@@ -50,9 +62,6 @@ export function SceneRenderer({
 
       {/* Scene Objects */}
       <SceneObjects />
-
-      {/* Scene Lights */}
-      <SceneLights />
 
       {/* Placement Preview */}
       <PlacementPreview />

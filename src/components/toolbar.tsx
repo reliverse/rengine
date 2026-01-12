@@ -15,14 +15,13 @@ import {
   RotateCw,
   Save,
   Scaling,
-  Settings as SettingsIcon,
   Square,
   Sun,
   Upload,
 } from "lucide-react";
 import { useState } from "react";
 import { ExportDialog } from "~/components/export-dialog";
-import { SettingsDialog } from "~/components/settings-panel";
+import { PwnImportDialog } from "~/components/pwn-import-dialog";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -38,7 +37,6 @@ import { type TransformTool, useSceneStore } from "~/stores/scene-store";
 import { getPresetList } from "~/utils/lighting-presets";
 import { type ImportProgress, modelImporter } from "~/utils/model-import";
 import { loadScene, saveScene } from "~/utils/scene-persistence";
-import type { SidebarContext } from "./unified-sidebar";
 
 const toolIcons = {
   select: MousePointer,
@@ -62,21 +60,13 @@ function getMimeType(fileName: string): string {
   }
 }
 
-interface ToolbarProps {
-  rightSidebarContext: SidebarContext;
-  setRightSidebarContext: (context: SidebarContext) => void;
-}
-
-export function Toolbar({
-  rightSidebarContext,
-  setRightSidebarContext,
-}: ToolbarProps) {
+export function Toolbar() {
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(
     null
   );
   const [isImporting, setIsImporting] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [pwnImportDialogOpen, setPwnImportDialogOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -156,7 +146,6 @@ export function Toolbar({
   const selectionCount = useSceneStore(
     (state) => state.selectedObjectIds.length
   );
-  const sceneMetadata = useSceneStore((state) => state.sceneMetadata);
 
   const handleToolSelect = (tool: TransformTool) => {
     setActiveTool(tool);
@@ -276,7 +265,6 @@ export function Toolbar({
     try {
       const sceneState = useSceneStore.getState();
       sceneState.clearScene();
-      sceneState.addObject("cube", [0, 0, 0]);
       sceneState.setCameraPosition([5, 5, 5]);
       sceneState.setCameraTarget([0, 0, 0]);
       sceneState.setSceneMetadata({
@@ -302,7 +290,7 @@ export function Toolbar({
         setTimeout(() => {
           toast({
             title: "New project created",
-            description: `Started a new scene with a basic cube. Auto-saved to ${fileName}`,
+            description: `Started a new empty scene. Auto-saved to ${fileName}`,
             duration: 3000,
           });
         }, 100);
@@ -311,8 +299,7 @@ export function Toolbar({
         setTimeout(() => {
           toast({
             title: "New project created",
-            description:
-              "Started a new scene with a basic cube. (Auto-save failed)",
+            description: "Started a new empty scene. (Auto-save failed)",
             duration: 3000,
           });
         }, 100);
@@ -399,39 +386,6 @@ export function Toolbar({
           variant="ghost"
         >
           Rengine
-        </Button>
-        <Button
-          className={cn(
-            "h-auto p-0 font-medium text-sm hover:bg-transparent hover:text-primary",
-            rightSidebarContext === "lighting" && "text-primary"
-          )}
-          onClick={() => setRightSidebarContext("lighting")}
-          title="Lighting Panel"
-          variant="ghost"
-        >
-          Lighting
-        </Button>
-        <Button
-          className={cn(
-            "h-auto p-0 font-medium text-sm hover:bg-transparent hover:text-primary",
-            rightSidebarContext === "materials" && "text-primary"
-          )}
-          onClick={() => setRightSidebarContext("materials")}
-          title="Materials Panel"
-          variant="ghost"
-        >
-          Materials
-        </Button>
-        <Button
-          className={cn(
-            "h-auto p-0 font-medium text-sm hover:bg-transparent hover:text-primary",
-            rightSidebarContext === "tools" && "text-primary"
-          )}
-          onClick={() => setRightSidebarContext("tools")}
-          title="Tools Panel"
-          variant="ghost"
-        >
-          Tools
         </Button>
       </div>
 
@@ -591,15 +545,6 @@ export function Toolbar({
 
       <Separator className="h-6" orientation="vertical" />
 
-      <div className="flex items-center gap-2 px-3 py-1">
-        <span
-          className={`font-medium text-sm ${sceneMetadata.isModified ? "text-orange-600" : ""}`}
-        >
-          {sceneMetadata.name}
-          {sceneMetadata.isModified && " *"}
-        </span>
-      </div>
-
       {selectionCount > 0 && (
         <div className="flex items-center gap-2 rounded-md bg-secondary px-3 py-1">
           <span className="font-medium text-sm">{selectionCount} selected</span>
@@ -641,6 +586,17 @@ export function Toolbar({
 
         <Button
           className="h-8 px-3"
+          onClick={() => setPwnImportDialogOpen(true)}
+          size="sm"
+          title="Import PWN File"
+          variant="ghost"
+        >
+          <File className="mr-2 h-4 w-4" />
+          Import PWN
+        </Button>
+
+        <Button
+          className="h-8 px-3"
           onClick={() => setExportDialogOpen(true)}
           size="sm"
           title="Export Scene"
@@ -652,19 +608,6 @@ export function Toolbar({
       </div>
 
       <Separator className="h-6" orientation="vertical" />
-
-      <div className="flex items-center gap-1">
-        <Button
-          className="h-8 px-3"
-          onClick={() => setSettingsDialogOpen(true)}
-          size="sm"
-          title="Settings"
-          variant="ghost"
-        >
-          <SettingsIcon className="mr-2 h-4 w-4" />
-          Settings
-        </Button>
-      </div>
 
       <div className="flex items-center gap-1">
         <Button
@@ -690,9 +633,9 @@ export function Toolbar({
         open={exportDialogOpen}
       />
 
-      <SettingsDialog
-        onOpenChange={setSettingsDialogOpen}
-        open={settingsDialogOpen}
+      <PwnImportDialog
+        isOpen={pwnImportDialogOpen}
+        onOpenChange={setPwnImportDialogOpen}
       />
     </div>
   );
