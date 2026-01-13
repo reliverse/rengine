@@ -17,6 +17,7 @@ import {
   type LightingPresetId,
 } from "~/utils/lighting-presets";
 import { clearModelCache } from "~/utils/model-import";
+import type { EnvironmentPreset } from "~/components/skybox";
 
 export type TransformTool = "select" | "move" | "rotate" | "scale";
 
@@ -101,10 +102,24 @@ export interface SceneState {
   fogNear: number;
   fogFar: number;
 
-  // Skybox settings
+  // Environment settings (expanded from skybox)
   skyboxEnabled: boolean;
-  skyboxPreset: string;
+  skyboxPreset: EnvironmentPreset;
   skyboxIntensity: number;
+  environmentIntensity: number;
+  backgroundBlurriness: number;
+  environmentRotation: [number, number, number];
+  backgroundRotation: [number, number, number];
+  groundProjection: boolean;
+  groundProjectionHeight: number;
+  groundProjectionRadius: number;
+  groundProjectionScale: number;
+  customEnvironmentFile: string | null;
+  liveEnvironment: boolean;
+  liveEnvironmentResolution: number;
+  cameraShakeEnabled: boolean;
+  cameraShakeIntensity: number;
+  cameraShakeSpeed: number;
 
   // Scene helpers
   axesVisible: boolean;
@@ -173,10 +188,24 @@ export interface SceneActions {
   setFogNear: (near: number) => void;
   setFogFar: (far: number) => void;
 
-  // Skybox
+  // Environment (expanded skybox)
   setSkyboxEnabled: (enabled: boolean) => void;
-  setSkyboxPreset: (preset: string) => void;
+  setSkyboxPreset: (preset: EnvironmentPreset) => void;
   setSkyboxIntensity: (intensity: number) => void;
+  setEnvironmentIntensity: (intensity: number) => void;
+  setBackgroundBlurriness: (blurriness: number) => void;
+  setEnvironmentRotation: (rotation: [number, number, number]) => void;
+  setBackgroundRotation: (rotation: [number, number, number]) => void;
+  setGroundProjection: (enabled: boolean) => void;
+  setGroundProjectionHeight: (height: number) => void;
+  setGroundProjectionRadius: (radius: number) => void;
+  setGroundProjectionScale: (scale: number) => void;
+  setCustomEnvironmentFile: (file: string | null) => void;
+  setLiveEnvironment: (enabled: boolean) => void;
+  setLiveEnvironmentResolution: (resolution: number) => void;
+  setCameraShakeEnabled: (enabled: boolean) => void;
+  setCameraShakeIntensity: (intensity: number) => void;
+  setCameraShakeSpeed: (speed: number) => void;
 
   // Scene helpers
   setAxesVisible: (visible: boolean) => void;
@@ -325,10 +354,24 @@ export const useSceneStore = create<SceneState & SceneActions>()(
     fogNear: 1,
     fogFar: 100,
 
-    // Skybox defaults
+    // Environment defaults
     skyboxEnabled: true,
     skyboxPreset: "cosmic",
     skyboxIntensity: 1,
+    environmentIntensity: 1,
+    backgroundBlurriness: 0,
+    environmentRotation: [0, 0, 0],
+    backgroundRotation: [0, 0, 0],
+    groundProjection: false,
+    groundProjectionHeight: 15,
+    groundProjectionRadius: 60,
+    groundProjectionScale: 1000,
+    customEnvironmentFile: null,
+    liveEnvironment: false,
+    liveEnvironmentResolution: 256,
+    cameraShakeEnabled: false,
+    cameraShakeIntensity: 0.1,
+    cameraShakeSpeed: 1,
 
     // Scene helpers defaults
     axesVisible: true,
@@ -680,12 +723,68 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       set({ skyboxEnabled: enabled });
       get().markSceneModified();
     },
-    setSkyboxPreset: (preset) => {
+    setSkyboxPreset: (preset: EnvironmentPreset) => {
       set({ skyboxPreset: preset });
       get().markSceneModified();
     },
     setSkyboxIntensity: (intensity) => {
       set({ skyboxIntensity: intensity });
+      get().markSceneModified();
+    },
+    setEnvironmentIntensity: (intensity) => {
+      set({ environmentIntensity: intensity });
+      get().markSceneModified();
+    },
+    setBackgroundBlurriness: (blurriness) => {
+      set({ backgroundBlurriness: blurriness });
+      get().markSceneModified();
+    },
+    setEnvironmentRotation: (rotation) => {
+      set({ environmentRotation: rotation });
+      get().markSceneModified();
+    },
+    setBackgroundRotation: (rotation) => {
+      set({ backgroundRotation: rotation });
+      get().markSceneModified();
+    },
+    setGroundProjection: (enabled) => {
+      set({ groundProjection: enabled });
+      get().markSceneModified();
+    },
+    setGroundProjectionHeight: (height) => {
+      set({ groundProjectionHeight: height });
+      get().markSceneModified();
+    },
+    setGroundProjectionRadius: (radius) => {
+      set({ groundProjectionRadius: radius });
+      get().markSceneModified();
+    },
+    setGroundProjectionScale: (scale) => {
+      set({ groundProjectionScale: scale });
+      get().markSceneModified();
+    },
+    setCustomEnvironmentFile: (file) => {
+      set({ customEnvironmentFile: file });
+      get().markSceneModified();
+    },
+    setLiveEnvironment: (enabled) => {
+      set({ liveEnvironment: enabled });
+      get().markSceneModified();
+    },
+    setLiveEnvironmentResolution: (resolution) => {
+      set({ liveEnvironmentResolution: resolution });
+      get().markSceneModified();
+    },
+    setCameraShakeEnabled: (enabled) => {
+      set({ cameraShakeEnabled: enabled });
+      get().markSceneModified();
+    },
+    setCameraShakeIntensity: (intensity) => {
+      set({ cameraShakeIntensity: intensity });
+      get().markSceneModified();
+    },
+    setCameraShakeSpeed: (speed) => {
+      set({ cameraShakeSpeed: speed });
       get().markSceneModified();
     },
 

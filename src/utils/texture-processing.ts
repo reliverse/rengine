@@ -260,7 +260,7 @@ function applyHue(data: Uint8ClampedArray, value: number): void {
 
     h = (h + hueShift / 60) % 6;
 
-    // Convert back to RGB (simplified)
+    // Convert back to RGB
     const c = delta;
     const x = c * (1 - Math.abs((h % 2) - 1));
     const m = max - c;

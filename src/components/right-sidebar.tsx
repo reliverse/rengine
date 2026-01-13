@@ -1,4 +1,12 @@
-import { useEffect, useState } from "react";
+import {
+  Bug,
+  Lightbulb,
+  Palette,
+  Settings,
+  Terminal,
+  Wrench,
+} from "lucide-react";
+import { memo, useEffect, useState } from "react";
 import { AnimationPanel } from "~/components/animation-panel";
 import { LightPropertyPanel } from "~/components/light-property-panel";
 import { MaterialPropertyPanel } from "~/components/material-property-panel";
@@ -10,16 +18,15 @@ import { ImgEditor } from "~/components/tools/img-editor";
 import { RwAnalyzer } from "~/components/tools/rw-analyzer";
 import { TxdEditor } from "~/components/tools/txd-editor";
 import { Button } from "~/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { cn } from "~/lib/utils";
 import { useSelectedMaterial } from "~/stores/material-store";
 import { useSelectedLight, useSelectedObject } from "~/stores/scene-store";
 import { debugLog } from "~/utils/debug";
 import { LightingPanel } from "./lighting-panel";
-import { SceneHierarchy } from "./scene-hierarchy";
 import { DffViewer } from "./tools/dff-viewer";
 
 export type SidebarContext =
-  | "scene"
   | "tools"
   | "lighting"
   | "materials"
@@ -34,10 +41,6 @@ interface RightSidebarProps {
   onContextChange?: (context: SidebarContext) => void;
 }
 
-function SceneSidebarContent() {
-  return <SceneHierarchy />;
-}
-
 function ToolsSidebarContent() {
   const selectedLight = useSelectedLight();
   const selectedMaterial = useSelectedMaterial();
@@ -47,7 +50,7 @@ function ToolsSidebarContent() {
   const hasAnimations = selectedObject?.animationController?.hasAnimations();
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent h-full overflow-auto">
       {/* Priority: Material > Light > Object */}
       {selectedMaterial ? (
         <MaterialPropertyPanel />
@@ -77,11 +80,19 @@ function ToolsSidebarContent() {
 }
 
 function LightingSidebarContent() {
-  return <LightingPanel />;
+  return (
+    <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent h-full overflow-auto">
+      <LightingPanel />
+    </div>
+  );
 }
 
 function MaterialsSidebarContent() {
-  return <ObjectMaterialPanel />;
+  return (
+    <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent h-full overflow-auto">
+      <ObjectMaterialPanel />
+    </div>
+  );
 }
 
 function RenderWareSidebarContent() {
@@ -91,98 +102,74 @@ function RenderWareSidebarContent() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Editor selector tabs */}
-      <div className="flex border-b">
-        <Button
-          className={`h-8 flex-1 rounded-none px-2 font-medium text-xs ${
-            activeEditor === "img"
-              ? "border-primary border-b-2 bg-secondary text-secondary-foreground"
-              : "hover:bg-muted"
-          }`}
-          onClick={() => setActiveEditor("img")}
-          size="sm"
-          variant="ghost"
-        >
-          IMG Archives
-        </Button>
-        <Button
-          className={`h-8 flex-1 rounded-none px-2 font-medium text-xs ${
-            activeEditor === "txd"
-              ? "border-primary border-b-2 bg-secondary text-secondary-foreground"
-              : "hover:bg-muted"
-          }`}
-          onClick={() => setActiveEditor("txd")}
-          size="sm"
-          variant="ghost"
-        >
-          TXD Textures
-        </Button>
-        <Button
-          className={`h-8 flex-1 rounded-none px-2 font-medium text-xs ${
-            activeEditor === "dff"
-              ? "border-primary border-b-2 bg-secondary text-secondary-foreground"
-              : "hover:bg-muted"
-          }`}
-          onClick={() => setActiveEditor("dff")}
-          size="sm"
-          variant="ghost"
-        >
-          DFF Viewer
-        </Button>
-        <Button
-          className={`h-8 flex-1 rounded-none px-2 font-medium text-xs ${
-            activeEditor === "analyzer"
-              ? "border-primary border-b-2 bg-secondary text-secondary-foreground"
-              : "hover:bg-muted"
-          }`}
-          onClick={() => setActiveEditor("analyzer")}
-          size="sm"
-          variant="ghost"
-        >
-          RW Analyze
-        </Button>
-        <Button
-          className={`h-8 flex-1 rounded-none px-2 font-medium text-xs ${
-            activeEditor === "col"
-              ? "border-primary border-b-2 bg-secondary text-secondary-foreground"
-              : "hover:bg-muted"
-          }`}
-          onClick={() => setActiveEditor("col")}
-          size="sm"
-          variant="ghost"
-        >
-          COL Collision
-        </Button>
-        <Button
-          className={`h-8 flex-1 rounded-none px-2 font-medium text-xs ${
-            activeEditor === "ide"
-              ? "border-primary border-b-2 bg-secondary text-secondary-foreground"
-              : "hover:bg-muted"
-          }`}
-          onClick={() => setActiveEditor("ide")}
-          size="sm"
-          variant="ghost"
-        >
-          IDE Editor
-        </Button>
-      </div>
+      <Tabs
+        className="flex h-full flex-col"
+        onValueChange={(value) => setActiveEditor(value as typeof activeEditor)}
+        value={activeEditor}
+      >
+        <TabsList className="mt-2 grid w-full shrink-0 grid-cols-3 gap-2 bg-muted/50 p-1">
+          <TabsTrigger
+            className="flex items-center gap-1 px-1 text-xs"
+            value="img"
+          >
+            IMG
+          </TabsTrigger>
+          <TabsTrigger
+            className="flex items-center gap-1 px-1 text-xs"
+            value="txd"
+          >
+            TXD
+          </TabsTrigger>
+          <TabsTrigger
+            className="flex items-center gap-1 px-1 text-xs"
+            value="dff"
+          >
+            DFF
+          </TabsTrigger>
+          <TabsTrigger
+            className="flex items-center gap-1 px-1 text-xs"
+            value="col"
+          >
+            COL
+          </TabsTrigger>
+          <TabsTrigger
+            className="flex items-center gap-1 px-1 text-xs"
+            value="analyzer"
+          >
+            RW
+          </TabsTrigger>
+          <TabsTrigger
+            className="flex items-center gap-1 px-1 text-xs"
+            value="ide"
+          >
+            IDE
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Editor content */}
-      <div className="flex-1 overflow-hidden">
-        {activeEditor === "img" ? (
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="img">
           <ImgEditor />
-        ) : activeEditor === "txd" ? (
+        </TabsContent>
+
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="txd">
           <TxdEditor />
-        ) : activeEditor === "dff" ? (
+        </TabsContent>
+
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="dff">
           <DffViewer />
-        ) : activeEditor === "col" ? (
+        </TabsContent>
+
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="col">
           <ColEditor />
-        ) : activeEditor === "analyzer" ? (
+        </TabsContent>
+
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="analyzer">
           <RwAnalyzer />
-        ) : (
+        </TabsContent>
+
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="ide">
           <IdeEditor />
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -209,7 +196,7 @@ function DebugSidebarContent() {
   }, []);
 
   return (
-    <div className="flex h-full flex-col p-4">
+    <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent h-full overflow-auto p-4">
       <h3 className="mb-4 font-semibold text-muted-foreground text-sm">
         Debug System
       </h3>
@@ -288,7 +275,7 @@ function DebugSidebarContent() {
 
 function SettingsSidebarContent() {
   return (
-    <div className="p-4">
+    <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent h-full overflow-auto p-4">
       <h3 className="mb-4 font-semibold text-muted-foreground text-sm">
         Settings
       </h3>
@@ -297,101 +284,95 @@ function SettingsSidebarContent() {
   );
 }
 
-export function RightSidebar({
+export const RightSidebar = memo(function RightSidebar({
   context,
   className,
   isRightSidebar,
   onContextChange,
 }: RightSidebarProps) {
-  const renderSidebarContent = () => {
-    switch (context) {
-      case "scene":
-        return <SceneSidebarContent />;
-      case "tools":
-        return <ToolsSidebarContent />;
-      case "lighting":
-        return <LightingSidebarContent />;
-      case "materials":
-        return <MaterialsSidebarContent />;
-      case "renderware":
-        return <RenderWareSidebarContent />;
-      case "debug":
-        return <DebugSidebarContent />;
-      case "settings":
-        return <SettingsSidebarContent />;
-      default:
-        return null;
-    }
+  const [activeTab, setActiveTab] = useState(context);
+
+  // Sync with external context changes
+  useEffect(() => {
+    setActiveTab(context);
+  }, [context]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as SidebarContext);
+    onContextChange?.(value as SidebarContext);
   };
 
   return (
     <div
-      className={`w-64 border-border border-r bg-muted/30 ${className || ""}`}
-      style={{ zIndex: 10 }}
-    >
-      {/* Tab buttons for right sidebar */}
-      {isRightSidebar && (
-        <div className="flex border-b bg-background/50 p-1">
-          <Button
-            className={cn(
-              "h-8 flex-1 px-2 font-medium text-xs",
-              context === "tools" && "bg-secondary text-secondary-foreground"
-            )}
-            onClick={() => onContextChange?.("tools")}
-            size="sm"
-            variant={context === "tools" ? "secondary" : "ghost"}
-          >
-            Tools
-          </Button>
-          <Button
-            className={cn(
-              "h-8 flex-1 px-2 font-medium text-xs",
-              context === "lighting" && "bg-secondary text-secondary-foreground"
-            )}
-            onClick={() => onContextChange?.("lighting")}
-            size="sm"
-            variant={context === "lighting" ? "secondary" : "ghost"}
-          >
-            Lighting
-          </Button>
-          <Button
-            className={cn(
-              "h-8 flex-1 px-2 font-medium text-xs",
-              context === "materials" &&
-                "bg-secondary text-secondary-foreground"
-            )}
-            onClick={() => onContextChange?.("materials")}
-            size="sm"
-            variant={context === "materials" ? "secondary" : "ghost"}
-          >
-            Materials
-          </Button>
-          <Button
-            className={cn(
-              "h-8 flex-1 px-2 font-medium text-xs",
-              context === "renderware" &&
-                "bg-secondary text-secondary-foreground"
-            )}
-            onClick={() => onContextChange?.("renderware")}
-            size="sm"
-            variant={context === "renderware" ? "secondary" : "ghost"}
-          >
-            RW
-          </Button>
-          <Button
-            className={cn(
-              "h-8 flex-1 px-2 font-medium text-xs",
-              context === "debug" && "bg-secondary text-secondary-foreground"
-            )}
-            onClick={() => onContextChange?.("debug")}
-            size="sm"
-            variant={context === "debug" ? "secondary" : "ghost"}
-          >
-            Debug
-          </Button>
-        </div>
+      className={cn(
+        "flex h-[calc(100%-3.5rem)] w-72 shrink-0 flex-col overflow-x-auto overflow-y-hidden rounded-lg border md:w-80 lg:w-96",
+        className
       )}
-      {renderSidebarContent()}
+    >
+      {isRightSidebar && (
+        <Tabs
+          className="flex h-full flex-col"
+          onValueChange={handleTabChange}
+          value={activeTab}
+        >
+          <TabsList className="grid w-full shrink-0 grid-cols-3 gap-2 bg-muted/50 p-1">
+            <TabsTrigger className="flex items-center gap-2" value="tools">
+              <Wrench className="h-4 w-4" />
+              Tools
+            </TabsTrigger>
+            <TabsTrigger className="flex items-center gap-2" value="lighting">
+              <Lightbulb className="h-4 w-4" />
+              Lighting
+            </TabsTrigger>
+            <TabsTrigger className="flex items-center gap-2" value="materials">
+              <Palette className="h-4 w-4" />
+              Materials
+            </TabsTrigger>
+            <TabsTrigger className="flex items-center gap-2" value="renderware">
+              <Terminal className="h-4 w-4" />
+              RenderWare
+            </TabsTrigger>
+            <TabsTrigger className="flex items-center gap-2" value="debug">
+              <Bug className="h-4 w-4" />
+              Debug
+            </TabsTrigger>
+            <TabsTrigger className="flex items-center gap-2" value="settings">
+              <Settings className="h-4 w-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent className="mt-4 flex-1 overflow-hidden" value="tools">
+            <ToolsSidebarContent />
+          </TabsContent>
+
+          <TabsContent className="mt-4 flex-1 overflow-hidden" value="lighting">
+            <LightingSidebarContent />
+          </TabsContent>
+
+          <TabsContent
+            className="mt-4 flex-1 overflow-hidden"
+            value="materials"
+          >
+            <MaterialsSidebarContent />
+          </TabsContent>
+
+          <TabsContent
+            className="mt-4 flex-1 overflow-hidden"
+            value="renderware"
+          >
+            <RenderWareSidebarContent />
+          </TabsContent>
+
+          <TabsContent className="mt-4 flex-1 overflow-hidden" value="debug">
+            <DebugSidebarContent />
+          </TabsContent>
+
+          <TabsContent className="mt-4 flex-1 overflow-hidden" value="settings">
+            <SettingsSidebarContent />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
-}
+});

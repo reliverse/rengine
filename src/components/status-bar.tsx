@@ -1,6 +1,5 @@
 /**
- * Professional Status Bar Component with Memory Monitoring
- * Based on RWMS status bar with real-time memory tracking
+ * Status Bar Component with Memory Monitoring
  */
 
 import { invoke } from "@tauri-apps/api/core";

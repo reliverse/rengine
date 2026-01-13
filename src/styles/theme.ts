@@ -1,6 +1,5 @@
 /**
- * Professional Dark Theme System for Rengine
- * Based on RWMS ModernDarkTheme with 30+ color constants
+ * Dark Theme System for Rengine
  * System-independent dark theme that works across all platforms
  */
 

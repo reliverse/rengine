@@ -10,7 +10,8 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -25,7 +26,7 @@ import {
 import { Separator } from "~/components/ui/separator";
 import { cn } from "~/lib/utils";
 import {
-  useFilteredTextures,
+  type TextureAsset,
   useTextureStats,
   useTextureStore,
 } from "~/stores/texture-store";
@@ -65,13 +66,16 @@ export function TextureLibrary({
   className,
   onTextureSelect,
 }: TextureLibraryProps) {
+  // Use separate selectors to avoid the infinite loop
+  const textures = useTextureStore((state) => state.textures);
+  const libraryVisible = useTextureStore((state) => state.libraryVisible);
+  const showThumbnails = useTextureStore((state) => state.showThumbnails);
+  const filterType = useTextureStore((state) => state.filterType);
+  const filterSearch = useTextureStore((state) => state.filterSearch);
+  const sortBy = useTextureStore((state) => state.sortBy);
+  const sortOrder = useTextureStore((state) => state.sortOrder);
+
   const {
-    libraryVisible,
-    filterType,
-    filterSearch,
-    sortBy,
-    sortOrder,
-    showThumbnails,
     setLibraryVisible,
     setFilterType,
     setFilterSearch,
@@ -81,10 +85,90 @@ export function TextureLibrary({
     exportAllTextures,
     selectTexture,
     removeTexture,
-  } = useTextureStore();
+  } = useTextureStore(
+    useShallow((state) => ({
+      setLibraryVisible: state.setLibraryVisible,
+      setFilterType: state.setFilterType,
+      setFilterSearch: state.setFilterSearch,
+      setSortBy: state.setSortBy,
+      setSortOrder: state.setSortOrder,
+      importTextures: state.importTextures,
+      exportAllTextures: state.exportAllTextures,
+      selectTexture: state.selectTexture,
+      removeTexture: state.removeTexture,
+    }))
+  );
 
-  const filteredTextures = useFilteredTextures();
+  // Memoize the textures array to prevent unnecessary re-computations
+  const texturesArray = useMemo(
+    () => Array.from(textures.values()),
+    [textures]
+  );
+
+  const filteredTextures = useMemo(() => {
+    let filtered = texturesArray;
+
+    // Filter by type
+    if (filterType !== "all") {
+      filtered = filtered.filter((texture) => texture.type === filterType);
+    }
+
+    // Filter by search
+    if (filterSearch) {
+      const search = filterSearch.toLowerCase();
+      filtered = filtered.filter(
+        (texture) =>
+          texture.name.toLowerCase().includes(search) ||
+          texture.metadata.tags.some((tag) =>
+            tag.toLowerCase().includes(search)
+          )
+      );
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "type":
+          comparison = a.type.localeCompare(b.type);
+          break;
+        case "size":
+          comparison = a.metadata.sizeBytes - b.metadata.sizeBytes;
+          break;
+        case "date":
+          comparison =
+            a.metadata.createdAt.getTime() - b.metadata.createdAt.getTime();
+          break;
+        case "usage":
+          comparison = a.usage.materialCount - b.usage.materialCount;
+          break;
+      }
+
+      return sortOrder === "desc" ? -comparison : comparison;
+    });
+
+    return filtered;
+  }, [texturesArray, filterType, filterSearch, sortBy, sortOrder]);
+
   const stats = useTextureStats();
+  const memoizedStats = useMemo(
+    () => ({
+      totalTextures: stats.totalTextures,
+      totalMemoryUsage: stats.totalMemoryUsage,
+      cacheHitRate: stats.cacheHitRate,
+      averageLoadTime: stats.averageLoadTime,
+    }),
+    [
+      stats.totalTextures,
+      stats.totalMemoryUsage,
+      stats.cacheHitRate,
+      stats.averageLoadTime,
+    ]
+  );
 
   const [dragOver, setDragOver] = useState(false);
   const [selectedTextures, setSelectedTextures] = useState<Set<string>>(
@@ -208,10 +292,10 @@ export function TextureLibrary({
 
         {/* Stats */}
         <div className="flex items-center gap-4 text-muted-foreground text-sm">
-          <span>{stats.totalTextures} textures</span>
-          <span>{formatFileSize(stats.totalMemoryUsage)} memory</span>
-          {stats.cacheHitRate > 0 && (
-            <span>{stats.cacheHitRate.toFixed(1)}% cache hit</span>
+          <span>{memoizedStats.totalTextures} textures</span>
+          <span>{formatFileSize(memoizedStats.totalMemoryUsage)} memory</span>
+          {memoizedStats.cacheHitRate > 0 && (
+            <span>{memoizedStats.cacheHitRate.toFixed(1)}% cache hit</span>
           )}
         </div>
       </CardHeader>
@@ -350,7 +434,7 @@ export function TextureLibrary({
             }}
             onDrop={handleFileDrop}
           >
-            {filteredTextures.map((texture) => (
+            {filteredTextures.map((texture: TextureAsset) => (
               <TextureCard
                 isSelected={selectedTextures.has(texture.id)}
                 key={texture.id}

@@ -1,8 +1,11 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 pub mod renderware;
+pub mod models;
 
 use base64::{engine::general_purpose, Engine as _};
+#[allow(unused_imports)]
+use lazy_static::lazy_static;
 use std::collections::HashSet;
 use crate::renderware::img::ImgArchive;
 use photon_rs::native::{open_image, save_image};
@@ -132,6 +135,22 @@ macro_rules! log_warn {
     };
     ($msg:expr, $($arg:tt)*) => {
         println!("[WARN] {}", format!($msg, $($arg)*));
+    };
+}
+
+// Global SA:MP model database - loaded once at startup
+lazy_static::lazy_static! {
+    static ref SAMP_MODEL_DATABASE: crate::models::SampModelDatabase = {
+        match crate::models::SampModelDatabase::load_from_embedded_csv() {
+            Ok(db) => {
+                println!("Loaded {} SA:MP models from embedded CSV", db.len());
+                db
+            }
+            Err(e) => {
+                eprintln!("Failed to load SA:MP model database: {}", e);
+                crate::models::SampModelDatabase::new()
+            }
+        }
     };
 }
 
@@ -1185,6 +1204,46 @@ pub struct PwnImportResult {
 }
 
 #[tauri::command]
+async fn import_dff_file(file_path: String) -> Result<crate::renderware::dff::DffModel, String> {
+    use crate::renderware::dff::DffModel;
+
+    match DffModel::load_from_path(&file_path) {
+        Ok(model) => Ok(model),
+        Err(e) => Err(format!("Failed to import DFF file: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn import_txd_file(file_path: String) -> Result<crate::renderware::txd::TxdArchive, String> {
+    use crate::renderware::txd::TxdArchive;
+
+    match TxdArchive::load_from_path(&file_path) {
+        Ok(archive) => Ok(archive),
+        Err(e) => Err(format!("Failed to import TXD file: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn import_col_file(file_path: String) -> Result<crate::renderware::col::ColFile, String> {
+    use crate::renderware::col::ColFile;
+
+    match ColFile::load_from_path(&file_path) {
+        Ok(col_file) => Ok(col_file),
+        Err(e) => Err(format!("Failed to import COL file: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn import_ipl_file(file_path: String) -> Result<crate::renderware::ipl::IPLFile, String> {
+    use crate::renderware::ipl::IPLFile;
+
+    match IPLFile::load_from_path(&file_path) {
+        Ok(ipl_file) => Ok(ipl_file),
+        Err(e) => Err(format!("Failed to import IPL file: {}", e)),
+    }
+}
+
+#[tauri::command]
 async fn parse_pwn_file(file_path: String) -> Result<PwnImportResult, String> {
     use regex::Regex;
     use std::fs::File;
@@ -1427,8 +1486,46 @@ pub fn run() {
             get_img_modification_info,
             get_memory_stats,
             get_home_directory,
-            parse_pwn_file
+            import_dff_file,
+            import_txd_file,
+            import_col_file,
+            import_ipl_file,
+            parse_pwn_file,
+            get_samp_model_by_id,
+            get_samp_model_by_name,
+            search_samp_models_by_name,
+            get_all_samp_models_count
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+
+// SA:MP Model Database Commands
+#[tauri::command]
+fn get_samp_model_by_id(id: u32) -> Result<Option<crate::models::SampModel>, String> {
+    Ok(SAMP_MODEL_DATABASE.get_model_by_id(id).cloned())
+}
+
+#[tauri::command]
+fn get_samp_model_by_name(name: String) -> Result<Option<crate::models::SampModel>, String> {
+    Ok(SAMP_MODEL_DATABASE.get_model_by_name(&name).cloned())
+}
+
+#[tauri::command]
+fn search_samp_models_by_name(query: String, limit: Option<usize>) -> Result<Vec<crate::models::SampModel>, String> {
+    let limit = limit.unwrap_or(10);
+    let models = if query.len() <= 2 {
+        // For short queries, use prefix search
+        SAMP_MODEL_DATABASE.find_models_by_name_prefix(&query, limit)
+    } else {
+        // For longer queries, use contains search
+        SAMP_MODEL_DATABASE.find_models_by_name_contains(&query, limit)
+    };
+
+    Ok(models.into_iter().cloned().collect())
+}
+
+#[tauri::command]
+fn get_all_samp_models_count() -> Result<usize, String> {
+    Ok(SAMP_MODEL_DATABASE.len())
+}
 }

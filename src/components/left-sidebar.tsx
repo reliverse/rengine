@@ -5,6 +5,7 @@ import {
   Circle,
   Eye,
   EyeOff,
+  ImageIcon,
   Lightbulb,
   Moon,
   Package,
@@ -14,7 +15,6 @@ import {
   Zap,
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
-import { SKYBOX_PRESETS } from "~/components/skybox";
 // import { FixedSizeTree as Tree } from "react-vtree";
 import { Badge } from "~/components/ui/badge";
 import { Label } from "~/components/ui/label";
@@ -28,7 +28,9 @@ import {
 import { Slider } from "~/components/ui/slider";
 import { Switch } from "~/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
+import { ENVIRONMENT_PRESETS } from "~/components/skybox";
 import { useSceneStore } from "~/stores/scene-store";
 import {
   useAdaptiveQualityEnabled,
@@ -37,6 +39,8 @@ import {
   useSettingsStore,
 } from "~/stores/settings-store";
 import { QualityLevel, type QualityLevelType } from "~/utils/adaptive-quality";
+import { AssetsPanel } from "./assets-panel";
+import { RemoteAssetsTab } from "./remote-assets-tab";
 import { useTheme } from "./theme-provider";
 
 // Regex for UUID validation
@@ -57,14 +61,38 @@ function SettingsContent() {
   const graphicsSettings = useGraphicsSettings();
   const adaptiveQualityEnabled = useAdaptiveQualityEnabled();
 
-  // Skybox settings
+  // Environment settings (expanded from skybox)
   const {
     skyboxEnabled,
     skyboxPreset,
     skyboxIntensity,
+    environmentIntensity,
+    backgroundBlurriness,
+    backgroundRotation,
+    groundProjection,
+    groundProjectionHeight,
+    groundProjectionRadius,
+    groundProjectionScale,
+    liveEnvironment,
+    liveEnvironmentResolution,
+    cameraShakeEnabled,
+    cameraShakeIntensity,
+    cameraShakeSpeed,
     setSkyboxEnabled,
     setSkyboxPreset,
     setSkyboxIntensity,
+    setEnvironmentIntensity,
+    setBackgroundBlurriness,
+    setBackgroundRotation,
+    setGroundProjection,
+    setGroundProjectionHeight,
+    setGroundProjectionRadius,
+    setGroundProjectionScale,
+    setLiveEnvironment,
+    setLiveEnvironmentResolution,
+    setCameraShakeEnabled,
+    setCameraShakeIntensity,
+    setCameraShakeSpeed,
   } = useSceneStore();
 
   return (
@@ -280,12 +308,12 @@ function SettingsContent() {
       </div>
 
       {/* Environment Section */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label>Enable Skybox</Label>
+            <Label>Enable Environment</Label>
             <p className="text-muted-foreground text-sm">
-              Use a 360° skybox background instead of solid color
+              Use advanced environment mapping with HDR lighting
             </p>
           </div>
           <Switch checked={skyboxEnabled} onCheckedChange={setSkyboxEnabled} />
@@ -293,8 +321,15 @@ function SettingsContent() {
 
         {skyboxEnabled && (
           <>
-            <div className="space-y-2">
-              <Label>Skybox Preset</Label>
+            {/* Environment Presets */}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Environment Preset</Label>
+                <p className="text-muted-foreground text-sm">
+                  Quick presets (1K HDR) • Use Remote tab for premium 4K EXR
+                  assets
+                </p>
+              </div>
               <Select
                 onValueChange={(value) => {
                   if (value) setSkyboxPreset(value);
@@ -305,31 +340,314 @@ function SettingsContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(SKYBOX_PRESETS).map(([key, preset]) => (
+                  {Object.entries(ENVIRONMENT_PRESETS).map(([key, preset]) => (
                     <SelectItem key={key} value={key}>
-                      {preset.name}
+                      {key === "custom"
+                        ? "Custom HDRI"
+                        : typeof preset === "string"
+                          ? preset
+                              .replace(/_/g, " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())
+                          : preset?.name || key}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Intensity Controls */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Background Intensity</Label>
+                  <span className="text-muted-foreground text-xs">
+                    {Math.round(skyboxIntensity * 100)}%
+                  </span>
+                </div>
+                <Slider
+                  max={2}
+                  min={0}
+                  onValueChange={(value) =>
+                    setSkyboxIntensity(Array.isArray(value) ? value[0] : value)
+                  }
+                  step={0.1}
+                  value={[skyboxIntensity]}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Environment Intensity</Label>
+                  <span className="text-muted-foreground text-xs">
+                    {Math.round(environmentIntensity * 100)}%
+                  </span>
+                </div>
+                <Slider
+                  max={2}
+                  min={0}
+                  onValueChange={(value) =>
+                    setEnvironmentIntensity(
+                      Array.isArray(value) ? value[0] : value
+                    )
+                  }
+                  step={0.1}
+                  value={[environmentIntensity]}
+                />
+              </div>
+            </div>
+
+            {/* Background Blurriness */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Skybox Intensity</Label>
+                <Label className="text-sm">Background Blurriness</Label>
                 <span className="text-muted-foreground text-xs">
-                  {Math.round(skyboxIntensity * 100)}%
+                  {Math.round(backgroundBlurriness * 100)}%
                 </span>
               </div>
               <Slider
-                max={2}
-                min={0.1}
+                max={1}
+                min={0}
                 onValueChange={(value) =>
-                  setSkyboxIntensity(Array.isArray(value) ? value[0] : value)
+                  setBackgroundBlurriness(
+                    Array.isArray(value) ? value[0] : value
+                  )
                 }
-                step={0.1}
-                value={[skyboxIntensity]}
+                step={0.01}
+                value={[backgroundBlurriness]}
               />
+            </div>
+
+            {/* Rotation Controls */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm">Rotation</h4>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="space-y-1">
+                  <Label>X</Label>
+                  <Input
+                    onChange={(e) => {
+                      const newRotation: [number, number, number] = [
+                        Number.parseFloat(e.target.value) || 0,
+                        backgroundRotation[1],
+                        backgroundRotation[2],
+                      ];
+                      setBackgroundRotation(newRotation);
+                    }}
+                    step="0.1"
+                    type="number"
+                    value={backgroundRotation[0]}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Y</Label>
+                  <Input
+                    onChange={(e) => {
+                      const newRotation: [number, number, number] = [
+                        backgroundRotation[0],
+                        Number.parseFloat(e.target.value) || 0,
+                        backgroundRotation[2],
+                      ];
+                      setBackgroundRotation(newRotation);
+                    }}
+                    step="0.1"
+                    type="number"
+                    value={backgroundRotation[1]}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Z</Label>
+                  <Input
+                    onChange={(e) => {
+                      const newRotation: [number, number, number] = [
+                        backgroundRotation[0],
+                        backgroundRotation[1],
+                        Number.parseFloat(e.target.value) || 0,
+                      ];
+                      setBackgroundRotation(newRotation);
+                    }}
+                    step="0.1"
+                    type="number"
+                    value={backgroundRotation[2]}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Ground Projection */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Ground Projection</Label>
+                  <p className="text-muted-foreground text-sm">
+                    Project environment onto ground plane
+                  </p>
+                </div>
+                <Switch
+                  checked={groundProjection}
+                  onCheckedChange={setGroundProjection}
+                />
+              </div>
+
+              {groundProjection && (
+                <div className="space-y-3 border-muted border-l-2 pl-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Height</Label>
+                      <span className="text-muted-foreground text-xs">
+                        {groundProjectionHeight}
+                      </span>
+                    </div>
+                    <Slider
+                      max={50}
+                      min={1}
+                      onValueChange={(value) =>
+                        setGroundProjectionHeight(
+                          Array.isArray(value) ? value[0] : value
+                        )
+                      }
+                      step={1}
+                      value={[groundProjectionHeight]}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Radius</Label>
+                      <span className="text-muted-foreground text-xs">
+                        {groundProjectionRadius}
+                      </span>
+                    </div>
+                    <Slider
+                      max={200}
+                      min={10}
+                      onValueChange={(value) =>
+                        setGroundProjectionRadius(
+                          Array.isArray(value) ? value[0] : value
+                        )
+                      }
+                      step={5}
+                      value={[groundProjectionRadius]}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Scale</Label>
+                      <span className="text-muted-foreground text-xs">
+                        {groundProjectionScale}
+                      </span>
+                    </div>
+                    <Slider
+                      max={5000}
+                      min={100}
+                      onValueChange={(value) =>
+                        setGroundProjectionScale(
+                          Array.isArray(value) ? value[0] : value
+                        )
+                      }
+                      step={100}
+                      value={[groundProjectionScale]}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Live Environment */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Live Environment</Label>
+                  <p className="text-muted-foreground text-sm">
+                    Generate environment from scene in real-time
+                  </p>
+                </div>
+                <Switch
+                  checked={liveEnvironment}
+                  onCheckedChange={setLiveEnvironment}
+                />
+              </div>
+
+              {liveEnvironment && (
+                <div className="space-y-2 border-muted border-l-2 pl-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Resolution</Label>
+                    <span className="text-muted-foreground text-xs">
+                      {liveEnvironmentResolution}px
+                    </span>
+                  </div>
+                  <Slider
+                    max={1024}
+                    min={128}
+                    onValueChange={(value) =>
+                      setLiveEnvironmentResolution(
+                        Array.isArray(value) ? value[0] : value
+                      )
+                    }
+                    step={64}
+                    value={[liveEnvironmentResolution]}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Camera Shake */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Camera Shake</Label>
+                  <p className="text-muted-foreground text-sm">
+                    Add camera shake effect for dynamic scenes
+                  </p>
+                </div>
+                <Switch
+                  checked={cameraShakeEnabled}
+                  onCheckedChange={setCameraShakeEnabled}
+                />
+              </div>
+
+              {cameraShakeEnabled && (
+                <div className="space-y-3 border-muted border-l-2 pl-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Intensity</Label>
+                      <span className="text-muted-foreground text-xs">
+                        {cameraShakeIntensity.toFixed(2)}
+                      </span>
+                    </div>
+                    <Slider
+                      max={1}
+                      min={0.01}
+                      onValueChange={(value) =>
+                        setCameraShakeIntensity(
+                          Array.isArray(value) ? value[0] : value
+                        )
+                      }
+                      step={0.01}
+                      value={[cameraShakeIntensity]}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Speed</Label>
+                      <span className="text-muted-foreground text-xs">
+                        {cameraShakeSpeed.toFixed(1)}x
+                      </span>
+                    </div>
+                    <Slider
+                      max={5}
+                      min={0.1}
+                      onValueChange={(value) =>
+                        setCameraShakeSpeed(
+                          Array.isArray(value) ? value[0] : value
+                        )
+                      }
+                      step={0.1}
+                      value={[cameraShakeSpeed]}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -565,8 +883,8 @@ const TreeNodeComponent = memo(function TreeNodeComponent({
   );
 });
 
-// Main scene hierarchy component
-export const SceneHierarchy = memo(function SceneHierarchy({
+// Main left sidebar component
+export const LeftSidebar = memo(function LeftSidebar({
   className,
 }: {
   className?: string;
@@ -708,7 +1026,7 @@ export const SceneHierarchy = memo(function SceneHierarchy({
   return (
     <div
       className={cn(
-        "flex h-[calc(100%-3.5rem)] flex-col overflow-hidden rounded-lg border",
+        "flex h-[calc(100%-3.5rem)] w-72 shrink-0 flex-col overflow-x-auto overflow-y-hidden rounded-lg border md:w-80 lg:w-96",
         className
       )}
     >
@@ -717,7 +1035,7 @@ export const SceneHierarchy = memo(function SceneHierarchy({
         onValueChange={setActiveTab}
         value={activeTab}
       >
-        <TabsList className="grid w-full shrink-0 grid-cols-2">
+        <TabsList className="grid w-full shrink-0 grid-cols-3 gap-2 bg-muted/50 p-1">
           <TabsTrigger className="flex items-center gap-2" value="hierarchy">
             <Package className="h-4 w-4" />
             Scene
@@ -725,13 +1043,17 @@ export const SceneHierarchy = memo(function SceneHierarchy({
               {objects.length + lights.length}
             </Badge>
           </TabsTrigger>
+          <TabsTrigger className="flex items-center gap-2" value="assets">
+            <ImageIcon className="h-4 w-4" />
+            Assets
+          </TabsTrigger>
           <TabsTrigger className="flex items-center gap-2" value="settings">
             <SettingsIcon className="h-4 w-4" />
             Settings
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent className="mt-0 flex-1 overflow-hidden" value="hierarchy">
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="hierarchy">
           {/* Tree */}
           <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent h-full overflow-auto">
             {(treeData.children || []).map((node) => (
@@ -746,10 +1068,18 @@ export const SceneHierarchy = memo(function SceneHierarchy({
           </div>
         </TabsContent>
 
-        <TabsContent className="mt-0 flex-1 overflow-hidden" value="settings">
-          <div className="h-full overflow-auto">
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="assets">
+          <AssetsPanel />
+        </TabsContent>
+
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="settings">
+          <div className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent h-full overflow-auto">
             <SettingsContent />
           </div>
+        </TabsContent>
+
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="remote">
+          <RemoteAssetsTab />
         </TabsContent>
       </Tabs>
     </div>

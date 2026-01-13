@@ -874,17 +874,24 @@ export const useTextureStore = create<
       const textures = Array.from(get().textures.values());
       const cacheStats = getTextureCacheStats();
 
-      set({
-        stats: {
-          totalTextures: textures.length,
-          totalMemoryUsage: cacheStats.memoryUsage,
-          cacheHitRate:
-            cacheStats.count > 0
-              ? (cacheStats.count / textures.length) * 100
-              : 0,
-          averageLoadTime: 0, // Would need to track load times
-        },
-      });
+      const newStats = {
+        totalTextures: textures.length,
+        totalMemoryUsage: cacheStats.memoryUsage,
+        cacheHitRate:
+          cacheStats.count > 0 ? (cacheStats.count / textures.length) * 100 : 0,
+        averageLoadTime: 0, // Would need to track load times
+      };
+
+      // Only update if stats actually changed
+      const currentStats = get().stats;
+      if (
+        currentStats.totalTextures !== newStats.totalTextures ||
+        currentStats.totalMemoryUsage !== newStats.totalMemoryUsage ||
+        currentStats.cacheHitRate !== newStats.cacheHitRate ||
+        currentStats.averageLoadTime !== newStats.averageLoadTime
+      ) {
+        set({ stats: newStats });
+      }
     },
 
     cleanupUnusedTextures: () => {

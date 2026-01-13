@@ -289,10 +289,9 @@ async function importModel(file: File): Promise<ImportResult> {
 ```
 App
 ├── Toolbar (File, Edit, View, Tools)
-├── RightSidebar
-│   ├── SceneHierarchy (Object tree)
-│   └── PropertyPanel (Object/light properties)
-└── SceneCanvas (3D viewport)
+├── LeftSidebar (Scene hierarchy and settings)
+├── SceneCanvas (3D viewport)
+└── RightSidebar (Properties, tools, materials, lighting, etc.)
     ├── SceneObjects
     ├── SceneLights
     ├── TransformControls

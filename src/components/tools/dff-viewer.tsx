@@ -1,6 +1,5 @@
 /**
- * DFF Model Viewer Component for Unified Sidebar
- * Based on RWMS DFF Viewer with Three.js WebGL rendering
+ * DFF Model Viewer Component
  */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -18,7 +17,6 @@ import { useToast } from "~/hooks/use-toast";
 import { cn } from "~/lib/utils";
 import type { DffModel, ModelViewerState, Vector3 } from "~/types/dff";
 
-// Simplified camera controller for sidebar use
 class SidebarCameraController {
   readonly camera: THREE.PerspectiveCamera;
   private readonly controls: OrbitControls;

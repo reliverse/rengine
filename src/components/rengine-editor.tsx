@@ -5,12 +5,13 @@ import { useEffect, useState } from "react";
 import { cn } from "~/lib/utils";
 import { useSceneStore } from "~/stores/scene-store";
 import { saveScene } from "~/utils/scene-persistence";
+import { LeftSidebar } from "./left-sidebar";
 import { ModelViewerCanvas } from "./model-viewer-canvas";
 import { PerformanceFooter } from "./performance-footer";
+import { RightSidebar, type SidebarContext } from "./right-sidebar";
 import { SceneCanvas } from "./scene-canvas";
 import { Toolbar } from "./toolbar";
 import { Button } from "./ui/button";
-import { type SidebarContext, RightSidebar } from "./right-sidebar";
 
 export type ViewportMode = "editor" | "model-viewer";
 
@@ -164,7 +165,7 @@ export function RengineEditor() {
         <div className="flex flex-1 overflow-hidden">
           {/* Left Sidebar - Scene Hierarchy */}
           <div className={cn("md:flex", showLeftSidebar ? "flex" : "hidden")}>
-            <RightSidebar context="scene" />
+            <LeftSidebar />
           </div>
 
           {/* 3D Canvas - Main Viewport */}

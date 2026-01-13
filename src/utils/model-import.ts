@@ -15,6 +15,7 @@ import { createAnimationController } from "./animation-system";
 import { validateGLTF } from "./gltf-extensions";
 import { textureOptimizer } from "./texture-optimizer";
 import { workerManager } from "./worker-manager";
+import { invoke } from "@tauri-apps/api/core";
 
 // Type for the result from worker manager parseModel
 interface ParseResult {
@@ -27,7 +28,9 @@ interface ParseResult {
   gltf?: any; // Full GLTF object for animation access
 }
 
-const FILE_EXTENSION_REGEX = /\.[^/.]+$/;
+// Regex patterns for file path parsing (consistent with assets-panel.tsx)
+const PATH_SEPARATOR_REGEX = /[/\\]/;
+const FILE_EXTENSION_REGEX = /\.(dff|obj|txd|col|ipl)$/i;
 
 // Asset cache for loaded models
 const MODEL_CACHE = new Map<
@@ -404,12 +407,12 @@ const optimizeModelTextures = (model: Object3D): void => {
   });
 };
 
-const createSceneObjectsFromModel = (
+const createSceneObjectsFromModel = async (
   model: Object3D,
   fileName: string,
   position: [number, number, number],
   warnings: string[]
-): SceneObject[] => {
+): Promise<SceneObject[]> => {
   const sceneObjects: SceneObject[] = [];
   let totalVertexCount = 0;
   let totalGeometryCount = 0;
@@ -498,10 +501,39 @@ const createSceneObjectsFromModel = (
     );
   }
 
+  // Extract base name for SA:MP model lookup
+  const fileNameOnly = fileName.split(PATH_SEPARATOR_REGEX).pop() || "";
+  const baseName = fileNameOnly.replace(FILE_EXTENSION_REGEX, "");
+
+  // Try to find matching SA:MP model (only if invoke is available and baseName is valid)
+  let sampModelId: number | undefined;
+  if (baseName && baseName.length > 0) {
+    try {
+      // Check if we're in an environment where invoke is available
+      if (typeof invoke !== "undefined") {
+        const sampModel = (await invoke("get_samp_model_by_name", {
+          name: baseName,
+        })) as { id: number; name: string; dff: string; txd: string } | null;
+
+        if (sampModel) {
+          sampModelId = sampModel.id;
+          console.log(
+            `✅ Auto-matched "${baseName}" to SA:MP model ID ${sampModelId} (${sampModel.dff})`
+          );
+        } else {
+          console.log(`ℹ️ No SA:MP model found for "${baseName}"`);
+        }
+      }
+    } catch (error) {
+      // SA:MP database not available or other error - continue without model ID
+      console.log(`⚠️ SA:MP model lookup failed for "${baseName}":`, error);
+    }
+  }
+
   // Create a single scene object for the entire model (better for selection and performance)
   const sceneObject: SceneObject = {
     id: `imported_${Math.random().toString(36).substr(2, 9)}`,
-    name: fileName.replace(FILE_EXTENSION_REGEX, ""),
+    name: baseName,
     type: "imported",
     position,
     rotation: [0, 0, 0],
@@ -510,6 +542,7 @@ const createSceneObjectsFromModel = (
     visible: true,
     importedModel: model,
     initialScale: safeGlobalScale,
+    modelid: sampModelId, // Auto-set SA:MP model ID if found
   };
 
   sceneObjects.push(sceneObject);
@@ -572,7 +605,7 @@ export const importFromFile = async (
 
     onProgress?.({ loaded: 90, total: 100, stage: "Creating scene objects" });
 
-    const sceneObjects = createSceneObjectsFromModel(
+    const sceneObjects = await createSceneObjectsFromModel(
       object3D,
       file.name,
       position,

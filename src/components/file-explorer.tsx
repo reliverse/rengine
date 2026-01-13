@@ -1,6 +1,5 @@
 /**
- * Professional File Explorer Component
- * Based on RWMS file explorer with responsive design and navigation
+ * File Explorer Component
  */
 
 import { invoke } from "@tauri-apps/api/core";
