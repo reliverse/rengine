@@ -1,9 +1,6 @@
 import { ErrorBoundary } from "~/components/error-boundary";
+import { RightSidebar, type SidebarContext } from "~/components/right-sidebar";
 import { StatusBar } from "~/components/status-bar";
-import {
-  type SidebarContext,
-  RightSidebar,
-} from "~/components/right-sidebar";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -14,7 +11,7 @@ interface MainLayoutProps {
 export function MainLayout({
   children,
   showSidebar = true,
-  sidebarContext = "scene",
+  sidebarContext = "tools",
 }: MainLayoutProps) {
   return (
     <ErrorBoundary>

@@ -183,7 +183,7 @@ impl RwAnalyzer {
 
             // Try to read asset name
             if cursor.get_ref().len() >= current_pos as usize + 8 {
-                // Skip some bytes to get to name (this is a simplified version)
+                // Skip some bytes to get to name
                 cursor.seek(SeekFrom::Start(current_pos + 4))
                     .map_err(|e| format!("Failed to seek for asset name: {}", e))?;
 

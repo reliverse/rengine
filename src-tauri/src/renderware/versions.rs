@@ -136,13 +136,11 @@ impl RenderWareVersionManager {
     }
 
     pub fn get_rw_version(&self, library_id: Option<i32>) -> i32 {
-        // Simplified version extraction - in real RWMS this is more complex
         library_id.unwrap_or(0)
     }
 
     #[allow(dead_code)]
     pub fn get_library_id(&self, version: i32, build: i32) -> i32 {
-        // Simplified library ID generation
         ((version & 0x3FF) << 14) | (build & 0x3FFF)
     }
 

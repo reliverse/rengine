@@ -1,6 +1,5 @@
 /**
- * Responsive Design Utilities for Rengine
- * Based on RWMS responsive design system with DPI awareness
+ * Responsive Design Utilities for Rengine with DPI awareness
  */
 
 export interface ResponsiveConfig {

@@ -644,7 +644,6 @@ class ReferenceCountingMetrics {
   }
 
   private calculateAverageLifetime(): number {
-    // Simplified calculation - would need more detailed tracking
     return (this.acquireCount + this.releaseCount) / Math.max(this.loadCount, 1);
   }
 }

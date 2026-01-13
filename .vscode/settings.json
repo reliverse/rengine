@@ -1,3 +1,84 @@
 {
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "typescript.experimental.useTsgo": true,
+  "terminal.integrated.enablePersistentSessions": false,
+  "json.schemaDownload.enable": true,
+  "editor.selectionClipboard": false,
+  "editor.formatOnSave": true,
+  "files.readonlyInclude": {
+    "**/routeTree.gen.ts": true,
+    "**/.tanstack/**/*": true,
+    "bun.lock": true
+  },
+  "files.watcherExclude": {
+    "**/routeTree.gen.ts": true,
+    "**/.tanstack/**/*": true,
+    "bun.lock": true
+  },
+  "search.exclude": {
+    "**/routeTree.gen.ts": true,
+    "**/.tanstack/**/*": true,
+    "bun.lock": true
+  },
+  "editor.quickSuggestions": {
+    "strings": "on"
+  },
+  "typescript.preferences.autoImportSpecifierExcludeRegexes": ["^(node:)?os$"],
+  "files.autoSave": "afterDelay",
+  "editor.defaultFormatter": "biomejs.biome",
+  "mdx.server.enable": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "never"
+  },
+  "markdownlint.config": {
+    "MD031": false,
+    "MD032": false,
+    "MD022": false,
+    "MD033": false,
+    "MD041": false
+  },
+  "editor.formatOnPaste": true,
+  "emmet.showExpandedAbbreviation": "never",
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[vue]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[svelte]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[graphql]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[mdx]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  }
 }
