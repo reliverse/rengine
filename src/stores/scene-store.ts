@@ -91,6 +91,13 @@ export interface SceneState {
     active: boolean;
     objectType: SceneObject["type"] | null;
     previewPosition: [number, number, number] | null;
+    importedPlacementData?: {
+      kind: "preloaded";
+      modelid: number;
+      name: string;
+      importedModel: THREE.Object3D;
+      initialScale: number;
+    };
   };
   lightsVisible: boolean;
   transformDragging: boolean; // Track when transform controls are being dragged
@@ -219,6 +226,13 @@ export interface SceneActions {
 
   // Object placement
   startPlacement: (objectType: SceneObject["type"]) => void;
+  startImportedPlacement: (placementData: {
+    kind: "preloaded";
+    modelid: number;
+    name: string;
+    importedModel: THREE.Object3D;
+    initialScale: number;
+  }) => void;
   updatePlacementPreview: (position: [number, number, number] | null) => void;
   confirmPlacement: () => void;
   cancelPlacement: () => void;
@@ -829,6 +843,18 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       });
     },
 
+    startImportedPlacement: (placementData) => {
+      set({
+        placementMode: {
+          active: true,
+          objectType: "imported",
+          previewPosition: null,
+          importedPlacementData: placementData,
+        },
+        selectedObjectIds: [], // Clear selection when entering placement mode
+      });
+    },
+
     updatePlacementPreview: (position) => {
       set((state) => ({
         placementMode: {
@@ -840,15 +866,56 @@ export const useSceneStore = create<SceneState & SceneActions>()(
 
     confirmPlacement: () => {
       const state = get();
-      if (
-        state.placementMode.active &&
-        state.placementMode.objectType &&
-        state.placementMode.previewPosition
-      ) {
-        const newObject = createDefaultObject(
-          state.placementMode.objectType,
-          state.placementMode.previewPosition
-        );
+      if (state.placementMode.active && state.placementMode.previewPosition) {
+        let newObject: SceneObject;
+
+        if (state.placementMode.importedPlacementData) {
+          // Handle imported model placement
+          const placementData = state.placementMode.importedPlacementData;
+          newObject = {
+            id: `object_${Math.random().toString(36).substr(2, 9)}`,
+            name: placementData.name,
+            type: "imported",
+            position: state.placementMode.previewPosition,
+            rotation: [0, 0, 0],
+            scale: [
+              placementData.initialScale,
+              placementData.initialScale,
+              placementData.initialScale,
+            ],
+            color: "#ffffff",
+            visible: true,
+            importedModel: placementData.importedModel,
+            initialScale: placementData.initialScale,
+            modelid: placementData.modelid,
+          };
+        } else if (state.placementMode.objectType) {
+          // Handle regular object placement
+          newObject = createDefaultObject(
+            state.placementMode.objectType,
+            state.placementMode.previewPosition
+          );
+
+          // Create and assign a default material for the new object
+          const materialStore = useMaterialStore.getState();
+          const materialName = `${newObject.name} Material`;
+          const materialId = materialStore.createMaterial(
+            materialName,
+            "standard",
+            {
+              color: newObject.color,
+              // Planes should be double-sided by default
+              side:
+                newObject.type === "plane" ? THREE.DoubleSide : THREE.FrontSide,
+            }
+          );
+
+          // Assign the material to the object
+          newObject.materialId = materialId;
+        } else {
+          return; // Invalid placement state
+        }
+
         set((state) => ({
           objects: [...state.objects, newObject],
           selectedObjectIds: [newObject.id],

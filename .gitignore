@@ -35,6 +35,5 @@ todos.json
 /.react-router/
 /build/
 
-# Large files that shouldn't be in git
-public/renderware/gta-sa/gta3.img
-public/renderware/**/*.img
+# Large files
+*.img
