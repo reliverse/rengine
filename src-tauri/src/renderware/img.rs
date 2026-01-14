@@ -4,6 +4,10 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use crate::RengineError;
 
+// IMG archive sector size (standard for GTA games)
+// All offsets and sizes in IMG entries are stored in sectors, not bytes
+const SECTOR_SIZE: u32 = 2048;
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ImgVersion {
     V1, // GTA III, Vice City
@@ -25,6 +29,7 @@ pub struct ImgArchive {
     pub file_path: String,
     pub entries: Vec<ImgEntry>,
     pub total_entries: usize,
+    pub file_size: u64,
     // Modification tracking
     pub modified: bool,
     pub deleted_entries: Vec<ImgEntry>,
@@ -82,6 +87,7 @@ impl ImgArchive {
             file_path: path.to_string(),
             entries,
             total_entries,
+            file_size: buffer.len() as u64,
             modified: false,
             deleted_entries: Vec::new(),
         })
@@ -91,6 +97,14 @@ impl ImgArchive {
     fn detect_version(buffer: &[u8]) -> Result<ImgVersion, RengineError> {
         // Version 2 (SA) has a different structure with more entries
         // We can detect by trying to parse as both versions
+
+        // Check for V2 signature first (VER2)
+        if buffer.len() >= 4 {
+            let signature = &buffer[0..4];
+            if signature == b"VER2" {
+                return Ok(ImgVersion::V2);
+            }
+        }
 
         // Try version 1 first (GTA III/VC format)
         if buffer.len() >= 8 {
@@ -134,7 +148,7 @@ impl ImgArchive {
             }
         }
 
-        // Try version 2 (SA format)
+        // Try version 2 without signature (fallback for files that don't have VER2 header)
         // Version 2 starts directly with entries, each 32 bytes
         if buffer.len() >= 32 {
             let mut valid_v2 = true;
@@ -216,9 +230,21 @@ impl ImgArchive {
                 }
             }
             ImgVersion::V2 => {
-                // Version 2: entries start at offset 0, continue until empty name
-                let mut entry_offset = 0;
+                // Check if file starts with VER2 signature
+                let entries_start = if buffer.len() >= 8 && &buffer[0..8] == b"VER2!6\x00\x00" {
+                    // Extended V2 header: VER2!6 + nulls (8 bytes) + entry_count (4) + unknown (4) = 16 bytes
+                    16
+                } else if buffer.len() >= 4 && &buffer[0..4] == b"VER2" {
+                    // Standard V2 header: VER2 (4 bytes) - entries follow immediately
+                    4
+                } else {
+                    // No header: entries start at offset 0
+                    0
+                };
 
+                let mut entry_offset = entries_start;
+
+                // Read entries until we can't read more
                 while entry_offset + 32 <= buffer.len() {
                     let entry_data = &buffer[entry_offset..entry_offset + 32];
                     let entry = Self::parse_entry(entry_data)?;
@@ -282,6 +308,10 @@ impl ImgArchive {
             Some("IPL".to_string())
         } else if filename_lower.ends_with(".ide") {
             Some("IDE".to_string())
+        } else if filename_lower.ends_with(".ifp") {
+            Some("IFP".to_string())
+        } else if filename_lower.ends_with(".dat") {
+            Some("DAT".to_string())
         } else {
             None
         }
@@ -300,14 +330,16 @@ impl ImgArchive {
             details: e.to_string(),
         })?;
 
-        // Seek to entry offset
-        file.seek(SeekFrom::Start(entry.offset as u64)).map_err(|e| RengineError::FileReadFailed {
+        // Seek to entry offset (convert from sectors to bytes)
+        let byte_offset = entry.offset as u64 * SECTOR_SIZE as u64;
+        file.seek(SeekFrom::Start(byte_offset)).map_err(|e| RengineError::FileReadFailed {
             path: self.file_path.clone(),
             details: format!("Seek error: {}", e),
         })?;
 
-        // Read entry data
-        let mut data = vec![0u8; entry.size as usize];
+        // Read entry data (convert from sectors to bytes)
+        let byte_size = entry.size as usize * SECTOR_SIZE as usize;
+        let mut data = vec![0u8; byte_size];
         file.read_exact(&mut data).map_err(|e| RengineError::FileReadFailed {
             path: self.file_path.clone(),
             details: format!("Read error: {}", e),
@@ -335,14 +367,16 @@ impl ImgArchive {
             details: e.to_string(),
         })?;
 
-        // Seek to entry offset
-        file.seek(SeekFrom::Start(entry.offset as u64)).map_err(|e| RengineError::FileReadFailed {
+        // Seek to entry offset (convert from sectors to bytes)
+        let byte_offset = entry.offset as u64 * SECTOR_SIZE as u64;
+        file.seek(SeekFrom::Start(byte_offset)).map_err(|e| RengineError::FileReadFailed {
             path: self.file_path.clone(),
             details: format!("Seek error: {}", e),
         })?;
 
-        // Read entry data
-        let mut data = vec![0u8; entry.size as usize];
+        // Read entry data (convert from sectors to bytes)
+        let byte_size = entry.size as usize * SECTOR_SIZE as usize;
+        let mut data = vec![0u8; byte_size];
         file.read_exact(&mut data).map_err(|e| RengineError::FileReadFailed {
             path: self.file_path.clone(),
             details: format!("Read error: {}", e),

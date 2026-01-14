@@ -71,7 +71,7 @@ impl SampModelDatabase {
     }
 
     pub fn load_from_embedded_csv() -> Result<Self, ModelError> {
-        let csv_content = include_str!("../../public/renderware/gta/models.csv");
+        let csv_content = include_str!("../../public/renderware/gta-sa/models.csv");
         let mut database = Self::new();
         let mut reader = csv::Reader::from_reader(csv_content.as_bytes());
 
