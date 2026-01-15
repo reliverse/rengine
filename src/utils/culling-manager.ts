@@ -29,7 +29,7 @@ export class CullingManager {
     frustumCulling: true,
     distanceCulling: true,
     occlusionCulling: false, // More expensive, disabled by default
-    maxDistance: 1000,
+    maxDistance: 24_000,
     minDistance: 0.1,
     hysteresis: 0.1,
   };
@@ -227,7 +227,7 @@ export class CullingManager {
         frustumCulling: true,
         distanceCulling: false,
         occlusionCulling: false,
-        maxDistance: 1000,
+        maxDistance: 24_000,
       };
     }
     if (objectCount < 1000) {
@@ -235,7 +235,7 @@ export class CullingManager {
         frustumCulling: true,
         distanceCulling: true,
         occlusionCulling: false,
-        maxDistance: 500,
+        maxDistance: 24_000,
         hysteresis: 0.2,
       };
     }
@@ -243,7 +243,7 @@ export class CullingManager {
       frustumCulling: true,
       distanceCulling: true,
       occlusionCulling: false, // Still disabled for performance
-      maxDistance: 200,
+      maxDistance: 24_000,
       hysteresis: 0.5,
     };
   }

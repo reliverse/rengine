@@ -1,6 +1,6 @@
+use crate::renderware::versions::RenderWareVersionManager;
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read, Seek, SeekFrom};
-use crate::renderware::versions::RenderWareVersionManager;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChunkHeader {
@@ -73,7 +73,8 @@ impl RwAnalyzer {
         let file_size = data.len() as u64;
 
         // Detect file format and version
-        let (format, format_description, rw_version) = self.version_manager
+        let (format, format_description, rw_version) = self
+            .version_manager
             .detect_file_format_version(data, file_path)?;
 
         // Parse the chunk tree
@@ -100,19 +101,40 @@ impl RwAnalyzer {
         })
     }
 
-    fn parse_chunk_tree(&self, cursor: &mut Cursor<&[u8]>, parent_limit: u64, depth: usize) -> Result<ChunkNode, String> {
+    fn parse_chunk_tree(
+        &self,
+        cursor: &mut Cursor<&[u8]>,
+        parent_limit: u64,
+        depth: usize,
+    ) -> Result<ChunkNode, String> {
         if cursor.position() + 12 > parent_limit {
             return Err("Not enough data for chunk header".to_string());
         }
 
         // Read chunk header (12 bytes)
         let mut header_bytes = [0u8; 12];
-        cursor.read_exact(&mut header_bytes)
+        cursor
+            .read_exact(&mut header_bytes)
             .map_err(|e| format!("Failed to read chunk header: {}", e))?;
 
-        let chunk_type = u32::from_le_bytes([header_bytes[0], header_bytes[1], header_bytes[2], header_bytes[3]]);
-        let chunk_size = u32::from_le_bytes([header_bytes[4], header_bytes[5], header_bytes[6], header_bytes[7]]);
-        let rw_version = u32::from_le_bytes([header_bytes[8], header_bytes[9], header_bytes[10], header_bytes[11]]);
+        let chunk_type = u32::from_le_bytes([
+            header_bytes[0],
+            header_bytes[1],
+            header_bytes[2],
+            header_bytes[3],
+        ]);
+        let chunk_size = u32::from_le_bytes([
+            header_bytes[4],
+            header_bytes[5],
+            header_bytes[6],
+            header_bytes[7],
+        ]);
+        let rw_version = u32::from_le_bytes([
+            header_bytes[8],
+            header_bytes[9],
+            header_bytes[10],
+            header_bytes[11],
+        ]);
 
         let offset = cursor.position() - 12;
 
@@ -159,7 +181,8 @@ impl RwAnalyzer {
 
         // Seek to end of chunk
         if chunk_end <= cursor.get_ref().len() as u64 {
-            cursor.seek(SeekFrom::Start(chunk_end))
+            cursor
+                .seek(SeekFrom::Start(chunk_end))
                 .map_err(|e| format!("Failed to seek to chunk end: {}", e))?;
         }
 
@@ -174,26 +197,36 @@ impl RwAnalyzer {
         })
     }
 
-    fn get_chunk_display_name(&self, header: &ChunkHeader, cursor: &mut Cursor<&[u8]>) -> Result<String, String> {
+    fn get_chunk_display_name(
+        &self,
+        header: &ChunkHeader,
+        cursor: &mut Cursor<&[u8]>,
+    ) -> Result<String, String> {
         let chunk_name = self.get_chunk_type_name(header.chunk_type);
 
         // Special handling for ASSET chunks
-        if header.chunk_type == 0x716 { // ASSET
+        if header.chunk_type == 0x716 {
+            // ASSET
             let current_pos = cursor.position();
 
             // Try to read asset name
             if cursor.get_ref().len() >= current_pos as usize + 8 {
                 // Skip some bytes to get to name
-                cursor.seek(SeekFrom::Start(current_pos + 4))
+                cursor
+                    .seek(SeekFrom::Start(current_pos + 4))
                     .map_err(|e| format!("Failed to seek for asset name: {}", e))?;
 
                 let mut name_size_bytes = [0u8; 4];
                 if cursor.read_exact(&mut name_size_bytes).is_ok() {
                     let name_size = u32::from_le_bytes(name_size_bytes) as usize;
 
-                    if name_size > 0 && name_size < 256 && cursor.get_ref().len() >= cursor.position() as usize + name_size {
+                    if name_size > 0
+                        && name_size < 256
+                        && cursor.get_ref().len() >= cursor.position() as usize + name_size
+                    {
                         let mut name_bytes = vec![0u8; name_size];
-                        cursor.read_exact(&mut name_bytes)
+                        cursor
+                            .read_exact(&mut name_bytes)
                             .map_err(|e| format!("Failed to read asset name: {}", e))?;
 
                         // Convert to string, cleaning up null terminators and invalid chars
@@ -205,7 +238,8 @@ impl RwAnalyzer {
 
                         if !name.is_empty() {
                             // Restore cursor position
-                            cursor.seek(SeekFrom::Start(current_pos))
+                            cursor
+                                .seek(SeekFrom::Start(current_pos))
                                 .map_err(|e| format!("Failed to restore cursor: {}", e))?;
                             return Ok(format!("ASSET: {}", name.trim()));
                         }
@@ -214,7 +248,8 @@ impl RwAnalyzer {
             }
 
             // Restore cursor position
-            cursor.seek(SeekFrom::Start(current_pos))
+            cursor
+                .seek(SeekFrom::Start(current_pos))
                 .map_err(|e| format!("Failed to restore cursor: {}", e))?;
         }
 
@@ -283,14 +318,20 @@ impl RwAnalyzer {
     }
 
     fn count_chunks(&self, node: &ChunkNode) -> usize {
-        1 + node.children.iter().map(|child| self.count_chunks(child)).sum::<usize>()
+        1 + node
+            .children
+            .iter()
+            .map(|child| self.count_chunks(child))
+            .sum::<usize>()
     }
 
     fn calculate_max_depth(&self, node: &ChunkNode) -> usize {
         if node.children.is_empty() {
             1
         } else {
-            1 + node.children.iter()
+            1 + node
+                .children
+                .iter()
                 .map(|child| self.calculate_max_depth(child))
                 .max()
                 .unwrap_or(0)
@@ -302,7 +343,10 @@ impl RwAnalyzer {
 
         if node.is_corrupt {
             if let Some(reason) = &node.corruption_reason {
-                warnings.push(format!("{} (offset 0x{:X}): {}", node.display_name, node.header.offset, reason));
+                warnings.push(format!(
+                    "{} (offset 0x{:X}): {}",
+                    node.display_name, node.header.offset, reason
+                ));
             }
         }
 
@@ -313,7 +357,12 @@ impl RwAnalyzer {
         warnings
     }
 
-    pub fn export_chunk(&self, data: &[u8], chunk_offset: u64, include_header: bool) -> Result<Vec<u8>, String> {
+    pub fn export_chunk(
+        &self,
+        data: &[u8],
+        chunk_offset: u64,
+        include_header: bool,
+    ) -> Result<Vec<u8>, String> {
         if chunk_offset as usize + 12 > data.len() {
             return Err("Invalid chunk offset".to_string());
         }
@@ -341,7 +390,13 @@ impl RwAnalyzer {
         Ok(data[data_start..data_end].to_vec())
     }
 
-    pub fn export_chunk_to_file(&self, data: &[u8], chunk_offset: u64, output_path: &str, include_header: bool) -> Result<ChunkExportResult, String> {
+    pub fn export_chunk_to_file(
+        &self,
+        data: &[u8],
+        chunk_offset: u64,
+        output_path: &str,
+        include_header: bool,
+    ) -> Result<ChunkExportResult, String> {
         let chunk_data = self.export_chunk(data, chunk_offset, include_header)?;
 
         std::fs::write(output_path, &chunk_data)
@@ -370,7 +425,12 @@ impl RwAnalyzer {
         })
     }
 
-    pub fn import_chunk_payload(&self, original_data: &[u8], chunk_offset: u64, new_payload: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn import_chunk_payload(
+        &self,
+        original_data: &[u8],
+        chunk_offset: u64,
+        new_payload: &[u8],
+    ) -> Result<Vec<u8>, String> {
         if chunk_offset as usize + 12 > original_data.len() {
             return Err("Invalid chunk offset".to_string());
         }
@@ -387,12 +447,13 @@ impl RwAnalyzer {
 
         // Build new file data
         let before_chunk = &original_data[0..header_start];
-        let after_chunk_start = payload_start + (u32::from_le_bytes([
-            original_data[header_start + 4],
-            original_data[header_start + 5],
-            original_data[header_start + 6],
-            original_data[header_start + 7],
-        ]) as usize);
+        let after_chunk_start = payload_start
+            + (u32::from_le_bytes([
+                original_data[header_start + 4],
+                original_data[header_start + 5],
+                original_data[header_start + 6],
+                original_data[header_start + 7],
+            ]) as usize);
 
         if after_chunk_start > original_data.len() {
             return Err("Original chunk size calculation error".to_string());

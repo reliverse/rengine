@@ -12,6 +12,7 @@ import {
 } from "~/components/ui/dialog";
 import { useToast } from "~/hooks/use-toast";
 import { useSceneStore } from "~/stores/scene-store";
+import { loadModelById } from "~/utils/model-loader";
 
 interface PwnObjectData {
   modelid: number;
@@ -94,42 +95,142 @@ export function PwnImportDialog({
 
       // Convert PWN objects to scene objects and add them
       let importedCount = 0;
-      for (const pwnObj of result.objects) {
-        const sceneObject = {
-          id: `pwn_import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          name: `Object_${pwnObj.modelid}`,
-          type: "imported" as const,
-          modelid: pwnObj.modelid,
-          position: [pwnObj.x, pwnObj.y, pwnObj.z] as [number, number, number],
-          rotation: [pwnObj.rx, pwnObj.ry, pwnObj.rz] as [
-            number,
-            number,
-            number,
-          ],
-          scale: [1, 1, 1] as [number, number, number],
-          color: "#ffffff", // Default white color for imported objects
-          visible: true,
-          // Store additional PWN data in a custom property
-          pwnData: {
-            worldid: pwnObj.worldid,
-            interiorid: pwnObj.interiorid,
-            playerid: pwnObj.playerid,
-            streamdistance: pwnObj.streamdistance,
-            drawdistance: pwnObj.drawdistance,
-            areaid: pwnObj.areaid,
-            priority: pwnObj.priority,
-          },
-        };
+      let placeholderCount = 0;
 
-        addObject(sceneObject);
-        importedCount++;
+      for (const pwnObj of result.objects) {
+        try {
+          // Try to load the actual 3D model by model ID
+          const modelResult = await loadModelById(pwnObj.modelid);
+
+          let sceneObject: any;
+
+          if (modelResult) {
+            // Successfully loaded the model
+            sceneObject = {
+              id: `pwn_import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              name: modelResult.modelData.name,
+              type: "imported" as const,
+              modelid: pwnObj.modelid,
+              position: [pwnObj.x, pwnObj.y, pwnObj.z] as [
+                number,
+                number,
+                number,
+              ],
+              rotation: [pwnObj.rx, pwnObj.ry, pwnObj.rz] as [
+                number,
+                number,
+                number,
+              ],
+              scale: [1, 1, 1] as [number, number, number],
+              color: "#ffffff",
+              visible: true,
+              importedModel: modelResult.importedModel,
+              initialScale: modelResult.initialScale,
+              // Store additional PWN data in a custom property
+              pwnData: {
+                worldid: pwnObj.worldid,
+                interiorid: pwnObj.interiorid,
+                playerid: pwnObj.playerid,
+                streamdistance: pwnObj.streamdistance,
+                drawdistance: pwnObj.drawdistance,
+                areaid: pwnObj.areaid,
+                priority: pwnObj.priority,
+              },
+              dffData: {
+                rw_version: 0, // Placeholder
+                frame_count: 0,
+                geometry_count: 0,
+                atomic_count: 0,
+                material_count: 0,
+              },
+            };
+          } else {
+            // Failed to load model, create a placeholder cube
+            placeholderCount++;
+            sceneObject = {
+              id: `pwn_import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              name: `Object_${pwnObj.modelid}`,
+              type: "cube" as const, // Fallback to cube type
+              modelid: pwnObj.modelid,
+              position: [pwnObj.x, pwnObj.y, pwnObj.z] as [
+                number,
+                number,
+                number,
+              ],
+              rotation: [pwnObj.rx, pwnObj.ry, pwnObj.rz] as [
+                number,
+                number,
+                number,
+              ],
+              scale: [1, 1, 1] as [number, number, number],
+              color: "#ff6b6b", // Reddish color to indicate placeholder
+              visible: true,
+              // Store additional PWN data in a custom property
+              pwnData: {
+                worldid: pwnObj.worldid,
+                interiorid: pwnObj.interiorid,
+                playerid: pwnObj.playerid,
+                streamdistance: pwnObj.streamdistance,
+                drawdistance: pwnObj.drawdistance,
+                areaid: pwnObj.areaid,
+                priority: pwnObj.priority,
+              },
+            };
+          }
+
+          addObject(sceneObject);
+          importedCount++;
+        } catch (error) {
+          console.error(
+            `Failed to process PWN object with modelid ${pwnObj.modelid}:`,
+            error
+          );
+          // Still add it as a basic cube as fallback
+          const fallbackObject = {
+            id: `pwn_import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: `Object_${pwnObj.modelid}`,
+            type: "cube" as const,
+            modelid: pwnObj.modelid,
+            position: [pwnObj.x, pwnObj.y, pwnObj.z] as [
+              number,
+              number,
+              number,
+            ],
+            rotation: [pwnObj.rx, pwnObj.ry, pwnObj.rz] as [
+              number,
+              number,
+              number,
+            ],
+            scale: [1, 1, 1] as [number, number, number],
+            color: "#ff0000", // Bright red for error fallback
+            visible: true,
+            pwnData: {
+              worldid: pwnObj.worldid,
+              interiorid: pwnObj.interiorid,
+              playerid: pwnObj.playerid,
+              streamdistance: pwnObj.streamdistance,
+              drawdistance: pwnObj.drawdistance,
+              areaid: pwnObj.areaid,
+              priority: pwnObj.priority,
+            },
+          };
+
+          addObject(fallbackObject);
+          importedCount++;
+          placeholderCount++;
+        }
       }
 
       // Show success message
+      let description = `Imported ${importedCount} object${importedCount !== 1 ? "s" : ""} from PWN file`;
+      if (placeholderCount > 0) {
+        description += `. ${placeholderCount} object${placeholderCount !== 1 ? "s" : ""} shown as placeholder${placeholderCount !== 1 ? "s" : ""} (DFF files not found).`;
+      }
+
       toast({
         title: "Import successful",
-        description: `Imported ${importedCount} object${importedCount !== 1 ? "s" : ""} from PWN file`,
-        duration: 3000,
+        description,
+        duration: placeholderCount > 0 ? 5000 : 3000,
       });
 
       // Close dialog
@@ -156,18 +257,31 @@ export function PwnImportDialog({
         <DialogHeader>
           <DialogTitle>Import PWN File</DialogTitle>
           <DialogDescription>
-            Import scene objects from a SA-MP Pawn script file (.pwn). The file
-            should contain CreateDynamicObject function calls.
+            Import scene objects from a SA-MP Pawn script file (.pwn). The
+            parser will automatically find and extract CreateDynamicObject
+            function calls from any content, including includes, comments, and
+            other code.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
           <div className="text-muted-foreground text-sm">
-            <p className="mb-2">Expected format:</p>
-            <code className="block rounded bg-muted p-2 text-xs">
-              CreateDynamicObject(modelid, Float:x, Float:y, Float:z, Float:rx,
-              Float:ry, Float:rz, worldid = value, interiorid = value, ...);
+            <p className="mb-2">Supported formats:</p>
+            <code className="mb-2 block rounded bg-muted p-2 text-xs">
+              CreateDynamicObject(modelid, x, y, z, rx, ry, rz, worldid,
+              interiorid, playerid, streamdistance, drawdistance, areaid,
+              priority);
             </code>
+            <code className="block rounded bg-muted p-2 text-xs">
+              CreateDynamicObject(modelid, x, y, z, rx, ry, rz, worldid = value,
+              interiorid = value, ...);
+            </code>
+            <p className="mt-2 text-xs">
+              Note: Basic parameters (modelid, x, y, z, rx, ry, rz) are
+              required. Optional parameters (worldid, interiorid, etc.) can be
+              omitted. The parser automatically handles includes, comments, and
+              other code.
+            </p>
           </div>
 
           <div className="text-muted-foreground text-sm">

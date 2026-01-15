@@ -3,8 +3,10 @@ import {
   ChevronDown,
   ChevronRight,
   Circle,
+  Code2,
   Eye,
   EyeOff,
+  Focus,
   ImageIcon,
   Lightbulb,
   Moon,
@@ -42,6 +44,7 @@ import { QualityLevel, type QualityLevelType } from "~/utils/adaptive-quality";
 import { AssetsPanel } from "./assets-panel";
 import { RemoteAssetsTab } from "./remote-assets-tab";
 import { useTheme } from "./theme-provider";
+import { BlueprintFileList } from "./blueprint/blueprint-file-list";
 
 // Regex for UUID validation
 const UUID_REGEX = /^[0-9a-f-]+$/;
@@ -78,6 +81,7 @@ function SettingsContent() {
     cameraShakeEnabled,
     cameraShakeIntensity,
     cameraShakeSpeed,
+    cameraPosition,
     setSkyboxEnabled,
     setSkyboxPreset,
     setSkyboxIntensity,
@@ -93,6 +97,7 @@ function SettingsContent() {
     setCameraShakeEnabled,
     setCameraShakeIntensity,
     setCameraShakeSpeed,
+    setCameraPosition,
   } = useSceneStore();
 
   return (
@@ -653,6 +658,66 @@ function SettingsContent() {
         )}
       </div>
 
+      {/* Camera Section */}
+      <div className="space-y-4">
+        <div className="space-y-3">
+          <h4 className="font-medium text-sm">Camera Position</h4>
+          <p className="text-muted-foreground text-sm">
+            Set camera position coordinates (x, y, z) to teleport the view
+          </p>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="space-y-1">
+              <Label>X</Label>
+              <Input
+                onChange={(e) => {
+                  const newPosition: [number, number, number] = [
+                    Number.parseFloat(e.target.value) || 0,
+                    cameraPosition[1],
+                    cameraPosition[2],
+                  ];
+                  setCameraPosition(newPosition);
+                }}
+                step="0.1"
+                type="number"
+                value={cameraPosition[0]}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Y</Label>
+              <Input
+                onChange={(e) => {
+                  const newPosition: [number, number, number] = [
+                    cameraPosition[0],
+                    Number.parseFloat(e.target.value) || 0,
+                    cameraPosition[2],
+                  ];
+                  setCameraPosition(newPosition);
+                }}
+                step="0.1"
+                type="number"
+                value={cameraPosition[1]}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Z</Label>
+              <Input
+                onChange={(e) => {
+                  const newPosition: [number, number, number] = [
+                    cameraPosition[0],
+                    cameraPosition[1],
+                    Number.parseFloat(e.target.value) || 0,
+                  ];
+                  setCameraPosition(newPosition);
+                }}
+                step="0.1"
+                type="number"
+                value={cameraPosition[2]}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Performance Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -736,11 +801,13 @@ const TreeNodeComponent = memo(function TreeNodeComponent({
   onToggle,
   onSelect,
   onToggleVisibility,
+  onTeleportTo,
 }: {
   node: TreeNode;
   onToggle: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
   onToggleVisibility: (nodeId: string) => void;
+  onTeleportTo: (nodeId: string) => void;
 }) {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = node.isExpanded;
@@ -763,6 +830,14 @@ const TreeNodeComponent = memo(function TreeNodeComponent({
       onToggleVisibility(node.id);
     },
     [node.id, onToggleVisibility]
+  );
+
+  const handleTeleportTo = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onTeleportTo(node.id);
+    },
+    [node.id, onTeleportTo]
   );
 
   const getIcon = () => {
@@ -830,24 +905,46 @@ const TreeNodeComponent = memo(function TreeNodeComponent({
         </div>
 
         {/* Visibility Toggle */}
-        <div
-          className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-md font-medium text-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-          onClick={handleToggleVisibility}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onToggleVisibility(node.id);
-            }
-          }}
-          role="button"
-          tabIndex={0}
-        >
-          {node.isVisible ? (
-            <Eye className="h-3 w-3" />
-          ) : (
-            <EyeOff className="h-3 w-3 opacity-50" />
-          )}
-        </div>
+        {node.type !== "group" && (
+          <div
+            className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-md font-medium text-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            onClick={handleToggleVisibility}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onToggleVisibility(node.id);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            title="Toggle visibility"
+          >
+            {node.isVisible ? (
+              <Eye className="h-3 w-3" />
+            ) : (
+              <EyeOff className="h-3 w-3 opacity-50" />
+            )}
+          </div>
+        )}
+
+        {/* Teleport to Object */}
+        {node.type !== "group" && (
+          <div
+            className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-md font-medium text-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            onClick={handleTeleportTo}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onTeleportTo(node.id);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            title="Focus camera on this item"
+          >
+            <Focus className="h-3 w-3" />
+          </div>
+        )}
 
         {/* Icon */}
         <div className="shrink-0 text-muted-foreground">{getIcon()}</div>
@@ -873,6 +970,7 @@ const TreeNodeComponent = memo(function TreeNodeComponent({
               key={child.id}
               node={child}
               onSelect={onSelect}
+              onTeleportTo={onTeleportTo}
               onToggle={onToggle}
               onToggleVisibility={onToggleVisibility}
             />
@@ -893,8 +991,14 @@ export const LeftSidebar = memo(function LeftSidebar({
   const lights = useSceneStore((state) => state.lights);
   const selectedObjectIds = useSceneStore((state) => state.selectedObjectIds);
   const selectedLightIds = useSceneStore((state) => state.selectedLightIds);
-  const { selectObject, selectLight, updateObject, updateLight } =
-    useSceneStore();
+  const {
+    selectObject,
+    selectLight,
+    updateObject,
+    updateLight,
+    focusOnObject,
+    focusOnLight,
+  } = useSceneStore();
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
     new Set(["root"])
@@ -982,6 +1086,9 @@ export const LeftSidebar = memo(function LeftSidebar({
       } else if (
         nodeId.startsWith("object_") ||
         nodeId.startsWith("imported_") ||
+        nodeId.startsWith("pwn_import_") ||
+        nodeId.startsWith("ipl_import_") ||
+        nodeId.startsWith("dff_import_") ||
         UUID_REGEX.test(nodeId)
       ) {
         selectObject(nodeId, false);
@@ -1005,6 +1112,24 @@ export const LeftSidebar = memo(function LeftSidebar({
       }
     },
     [lights, objects, updateLight, updateObject]
+  );
+
+  const handleTeleportTo = useCallback(
+    (nodeId: string) => {
+      if (nodeId.startsWith("light_")) {
+        focusOnLight(nodeId);
+      } else if (
+        nodeId.startsWith("object_") ||
+        nodeId.startsWith("imported_") ||
+        nodeId.startsWith("pwn_import_") ||
+        nodeId.startsWith("ipl_import_") ||
+        nodeId.startsWith("dff_import_") ||
+        UUID_REGEX.test(nodeId)
+      ) {
+        focusOnObject(nodeId);
+      }
+    },
+    [focusOnObject, focusOnLight]
   );
 
   if (objects.length === 0 && lights.length === 0) {
@@ -1035,13 +1160,17 @@ export const LeftSidebar = memo(function LeftSidebar({
         onValueChange={setActiveTab}
         value={activeTab}
       >
-        <TabsList className="grid w-full shrink-0 grid-cols-3 gap-2 bg-muted/50 p-1">
+        <TabsList className="grid w-full shrink-0 grid-cols-4 gap-2 bg-muted/50 p-1">
           <TabsTrigger className="flex items-center gap-2" value="hierarchy">
             <Package className="h-4 w-4" />
             Scene
             <Badge className="text-xs" variant="secondary">
               {objects.length + lights.length}
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger className="flex items-center gap-2" value="blueprints">
+            <Code2 className="h-4 w-4" />
+            Blueprints
           </TabsTrigger>
           <TabsTrigger className="flex items-center gap-2" value="assets">
             <ImageIcon className="h-4 w-4" />
@@ -1061,11 +1190,16 @@ export const LeftSidebar = memo(function LeftSidebar({
                 key={node.id}
                 node={node}
                 onSelect={handleSelect}
+                onTeleportTo={handleTeleportTo}
                 onToggle={handleToggle}
                 onToggleVisibility={handleToggleVisibility}
               />
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent className="mt-4 flex-1 overflow-hidden" value="blueprints">
+          <BlueprintFileList />
         </TabsContent>
 
         <TabsContent className="mt-4 flex-1 overflow-hidden" value="assets">

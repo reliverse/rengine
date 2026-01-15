@@ -1,1 +1,1 @@
-CreateDynamicObject(11731, Float:-2.1217, Float:0.6306, Float:0.0000, Float:0.0000, Float:0.0000, Float:0.0000, worldid = -1, interiorid = -1, playerid = -1, Float:streamdistance = STREAMER_OBJECT_SD, Float:drawdistance = STREAMER_OBJECT_DD, areaid = -1, priority = 0);
+CreateDynamicObject(11731, -2.1217, 0.6306, 0.0000, 0.0000, 0.0000, 0.0000, worldid = -1, interiorid = -1, playerid = -1, streamdistance = STREAMER_OBJECT_SD, drawdistance = STREAMER_OBJECT_DD, areaid = -1, priority = 0);

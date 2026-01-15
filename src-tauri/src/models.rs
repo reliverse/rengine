@@ -164,6 +164,8 @@ mod tests {
         // Test case insensitive prefix search
         let models = database.find_models_by_name_prefix("spl", 5);
         assert!(!models.is_empty());
-        assert!(models.iter().all(|m| m.name.to_lowercase().starts_with("spl")));
+        assert!(models
+            .iter()
+            .all(|m| m.name.to_lowercase().starts_with("spl")));
     }
 }

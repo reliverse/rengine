@@ -1,0 +1,130 @@
+// Pawn language grammar for pest parser
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+identifier = @{ ASCII_ALPHANUMERIC+ | "_" ~ (ASCII_ALPHANUMERIC | "_")* }
+integer = @{ "-"? ~ ASCII_DIGIT+ }
+float = @{ "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" | "'" ~ (!"'" ~ ANY)* ~ "'" }
+
+// Types
+type_tag = { "Float" | "String" | "bool" | identifier }
+type_name = { type_tag? ~ identifier }
+array_type = { type_name ~ "[" ~ integer? ~ "]" }
+
+// Expressions (avoiding left-recursion)
+literal = _{ integer | float | string | "true" | "false" | "NULL" }
+variable = { identifier }
+array_access = { identifier ~ "[" ~ expression ~ "]" }
+member_access = { identifier ~ "." ~ identifier }
+
+unary_operator = { "!" | "-" | "+" | "++" | "--" }
+
+binary_operator_mul = { "*" | "/" | "%" }
+binary_operator_add = { "+" | "-" }
+binary_operator_comp = { "==" | "!=" | "<" | ">" | "<=" | ">=" }
+binary_operator_logical = { "&&" | "||" }
+assignment_operator = { "=" | "+=" | "-=" | "*=" | "/=" | "%=" }
+
+// Expression hierarchy (bottom-up to avoid left-recursion)
+primary_expression = _{ 
+    literal | 
+    variable | 
+    array_access | 
+    member_access | 
+    "(" ~ expression ~ ")" |
+    function_call
+}
+
+function_call = { identifier ~ "(" ~ (expression ~ ("," ~ expression)*)? ~ ")" }
+
+unary_expression = { (unary_operator ~ unary_expression) | primary_expression }
+
+multiplicative_expression = { 
+    unary_expression ~ (binary_operator_mul ~ unary_expression)* 
+}
+
+additive_expression = { 
+    multiplicative_expression ~ (binary_operator_add ~ multiplicative_expression)* 
+}
+
+comparison_expression = { 
+    additive_expression ~ (binary_operator_comp ~ additive_expression)* 
+}
+
+logical_expression = { 
+    comparison_expression ~ (binary_operator_logical ~ comparison_expression)* 
+}
+
+assignment_expression = { 
+    logical_expression ~ (assignment_operator ~ assignment_expression)?
+}
+
+expression = { assignment_expression }
+
+// Statements
+statement = _{ 
+    expression_statement |
+    variable_declaration |
+    assignment_statement |
+    if_statement |
+    while_statement |
+    for_statement |
+    return_statement |
+    break_statement |
+    continue_statement |
+    block_statement
+}
+
+expression_statement = { expression ~ ";" }
+variable_declaration = { "new" ~ type_name ~ identifier ~ ("=" ~ expression)? ~ ";" }
+assignment_statement = { expression ~ "=" ~ expression ~ ";" }
+
+if_statement = { 
+    "if" ~ "(" ~ expression ~ ")" ~ statement ~ 
+    ("else" ~ statement)?
+}
+
+while_statement = { "while" ~ "(" ~ expression ~ ")" ~ statement }
+for_statement = { 
+    "for" ~ "(" ~ 
+        (variable_declaration | expression_statement)? ~ 
+        expression? ~ ";" ~ 
+        expression? ~ 
+    ")" ~ statement
+}
+
+return_statement = { "return" ~ expression? ~ ";" }
+break_statement = { "break" ~ ";" }
+continue_statement = { "continue" ~ ";" }
+block_statement = { "{" ~ statement* ~ "}" }
+
+// Function parameters
+parameter = { type_name ~ identifier ~ ("=" ~ expression)? }
+parameter_list = { parameter ~ ("," ~ parameter)* }
+
+// Functions
+function_modifier = { "public" | "stock" | "forward" | "native" | "static" }
+function = { 
+    function_modifier* ~ 
+    type_name ~ 
+    identifier ~ 
+    "(" ~ parameter_list? ~ ")" ~ 
+    ("=" ~ expression ~ ";" | block_statement)
+}
+
+// Callbacks (SAMP-specific)
+callback = { 
+    "public" ~ "On" ~ identifier ~ "(" ~ parameter_list? ~ ")" ~ block_statement
+}
+
+// Includes and directives
+include = { "#include" ~ "<" ~ identifier ~ ">" | "#include" ~ "\"" ~ identifier ~ "\"" }
+define = { "#define" ~ identifier ~ (expression | string)? }
+pragma = { "#pragma" ~ identifier ~ expression? }
+
+directive = { include | define | pragma }
+
+// Program
+program = { SOI ~ (directive | function | callback | statement)* ~ EOI }

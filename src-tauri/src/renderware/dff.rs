@@ -1,8 +1,8 @@
+use crate::renderware::dfx;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use thiserror::Error;
-use crate::renderware::dfx;
 
 // RenderWare section types
 #[allow(dead_code)]
@@ -328,8 +328,11 @@ impl DffModel {
         // Read the main CLUMP section header
         let (section_type, _section_size, rw_version) = Self::read_section_header(reader)?;
 
-        if section_type != 0x0010 { // CLUMP
-            return Err(DffError::InvalidFormat("Expected CLUMP section".to_string()));
+        if section_type != 0x0010 {
+            // CLUMP
+            return Err(DffError::InvalidFormat(
+                "Expected CLUMP section".to_string(),
+            ));
         }
 
         // Read the STRUCT child section header
@@ -404,50 +407,54 @@ impl DffModel {
         if let Some(null_pos) = buf.iter().position(|&c| c == 0) {
             buf.truncate(null_pos);
         }
-        String::from_utf8(buf).map_err(|e| DffError::InvalidFormat(format!("Invalid UTF-8 string: {}", e)))
+        String::from_utf8(buf)
+            .map_err(|e| DffError::InvalidFormat(format!("Invalid UTF-8 string: {}", e)))
     }
 
     fn skip_to_section<R: Read + Seek>(reader: &mut R, target_type: u32) -> Result<(), DffError> {
         // Get current position to track bounds
         let start_pos = reader.stream_position()?;
-        
+
         // Get file size if possible (for bounds checking)
         let file_size = reader.seek(SeekFrom::End(0))?;
         reader.seek(SeekFrom::Start(start_pos))?;
-        
+
         // Maximum iterations to prevent infinite loops
         const MAX_ITERATIONS: usize = 10000;
         let mut iterations = 0;
-        
+
         loop {
             // Check iteration limit
             if iterations >= MAX_ITERATIONS {
-                return Err(DffError::InvalidFormat(
-                    format!("Section type 0x{:X} not found after {} iterations", target_type, MAX_ITERATIONS)
-                ));
+                return Err(DffError::InvalidFormat(format!(
+                    "Section type 0x{:X} not found after {} iterations",
+                    target_type, MAX_ITERATIONS
+                )));
             }
             iterations += 1;
-            
+
             // Check if we've gone past file bounds
             let current_pos = reader.stream_position()?;
             if current_pos >= file_size {
-                return Err(DffError::InvalidFormat(
-                    format!("Section type 0x{:X} not found before end of file", target_type)
-                ));
+                return Err(DffError::InvalidFormat(format!(
+                    "Section type 0x{:X} not found before end of file",
+                    target_type
+                )));
             }
-            
+
             let (section_type, section_size, _) = Self::read_section_header(reader)?;
-            
+
             if section_type == target_type {
                 return Ok(());
             }
-            
+
             // Skip the section data
             let new_pos = reader.stream_position()? + section_size as u64;
             if new_pos > file_size {
-                return Err(DffError::InvalidFormat(
-                    format!("Section size {} exceeds file bounds", section_size)
-                ));
+                return Err(DffError::InvalidFormat(format!(
+                    "Section size {} exceeds file bounds",
+                    section_size
+                )));
             }
             reader.seek(SeekFrom::Current(section_size as i64))?;
         }
@@ -456,7 +463,7 @@ impl DffModel {
     fn read_frame_list<R: Read + Seek>(reader: &mut R) -> Result<Vec<Frame>, DffError> {
         // Read the STRUCT child section header
         let (_struct_type, _struct_size, _struct_version) = Self::read_section_header(reader)?;
-        
+
         let num_frames = Self::read_u32(reader)?;
 
         let mut frames = Vec::new();
@@ -492,7 +499,7 @@ impl DffModel {
 
             // Parent (4 bytes: 1 i32)
             let parent = Self::read_u32(reader)? as i32;
-            
+
             // Creation flags (4 bytes: 1 u32)
             let _creation_flags = Self::read_u32(reader)?;
 
@@ -514,7 +521,7 @@ impl DffModel {
     fn read_geometry_list<R: Read + Seek>(reader: &mut R) -> Result<Vec<Geometry>, DffError> {
         // Read the STRUCT child section header
         let (_struct_type, _struct_size, _struct_version) = Self::read_section_header(reader)?;
-        
+
         let num_geometries = Self::read_u32(reader)?;
 
         let mut geometries = Vec::new();
@@ -529,7 +536,7 @@ impl DffModel {
     fn read_geometry<R: Read + Seek>(reader: &mut R) -> Result<Geometry, DffError> {
         // First read the GEOMETRY section header
         let (_geom_type, _geom_size, _geom_version) = Self::read_section_header(reader)?;
-        
+
         // Then read the STRUCT child section header
         let (_struct_type, _struct_size, _struct_version) = Self::read_section_header(reader)?;
 
@@ -540,12 +547,12 @@ impl DffModel {
 
         // If native geometry, data is stored differently
         let is_native = flags & 0x01000000 != 0;
-        
+
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
         let mut uv_layers = Vec::new();
         let mut triangles = Vec::new();
-        
+
         if !is_native {
             // Read prelit colors if present (rpGEOMETRYPRELIT = 0x08)
             if flags & 0x00000008 != 0 {
@@ -562,9 +569,15 @@ impl DffModel {
             let has_tex2 = flags & 0x00000080 != 0;
             let mut num_uv_layers = ((flags >> 16) & 0xFF) as usize;
             if num_uv_layers == 0 {
-                num_uv_layers = if has_tex2 { 2 } else if has_tex { 1 } else { 0 };
+                num_uv_layers = if has_tex2 {
+                    2
+                } else if has_tex {
+                    1
+                } else {
+                    0
+                };
             }
-            
+
             for _ in 0..num_uv_layers {
                 let mut uv_layer = Vec::new();
                 for _ in 0..num_vertices {
@@ -585,14 +598,14 @@ impl DffModel {
                 triangles.push(Triangle { a, b, c });
             }
         }
-        
+
         // Read morph target data (bounding sphere + vertices + normals)
         // Bounding sphere (16 bytes: x, y, z, radius)
         let _bsphere_x = Self::read_f32(reader)?;
         let _bsphere_y = Self::read_f32(reader)?;
         let _bsphere_z = Self::read_f32(reader)?;
         let _bsphere_r = Self::read_f32(reader)?;
-        
+
         // Has positions and has normals flags
         let has_positions = Self::read_u32(reader)?;
         let has_normals_flag = Self::read_u32(reader)?;
@@ -621,18 +634,19 @@ impl DffModel {
 
         // Now read the MATERIAL_LIST section
         let (_matlist_type, _matlist_size, _matlist_version) = Self::read_section_header(reader)?;
-        
+
         // Read MATERIAL_LIST STRUCT
-        let (_ml_struct_type, _ml_struct_size, _ml_struct_version) = Self::read_section_header(reader)?;
-        
+        let (_ml_struct_type, _ml_struct_size, _ml_struct_version) =
+            Self::read_section_header(reader)?;
+
         // Read materials count
         let num_materials = Self::read_u32(reader)?;
-        
+
         // Skip material indices array (num_materials * 4 bytes)
         for _i in 0..num_materials {
             let _mat_idx = Self::read_u32(reader)?;
         }
-        
+
         let mut materials = Vec::new();
         for _i in 0..num_materials {
             materials.push(Self::read_material(reader)?);
@@ -667,7 +681,10 @@ impl DffModel {
         let (section_type, section_size, _rw_version) = Self::read_section_header(reader)?;
 
         if section_type != RW_SECTION_MATERIAL {
-            return Err(DffError::InvalidFormat(format!("Expected Material section (0x{:04X}), got 0x{:04X}", RW_SECTION_MATERIAL, section_type)));
+            return Err(DffError::InvalidFormat(format!(
+                "Expected Material section (0x{:04X}), got 0x{:04X}",
+                RW_SECTION_MATERIAL, section_type
+            )));
         }
 
         let material_start_pos = reader.stream_position()?;
@@ -675,7 +692,7 @@ impl DffModel {
 
         // Read struct section
         let (_struct_type, _struct_size, _struct_version) = Self::read_section_header(reader)?;
-        
+
         let _unknown1 = Self::read_u32(reader)?;
         let color = Color {
             r: Self::read_u8(reader)?,
@@ -707,7 +724,8 @@ impl DffModel {
                 let ext_end_pos = reader.stream_position()? + ext_size as u64;
 
                 while reader.stream_position()? < ext_end_pos {
-                    let (plugin_type, plugin_size, _plugin_version) = Self::read_section_header(reader)?;
+                    let (plugin_type, plugin_size, _plugin_version) =
+                        Self::read_section_header(reader)?;
                     let plugin_end_pos = reader.stream_position()? + plugin_size as u64;
 
                     match plugin_type {
@@ -760,7 +778,7 @@ impl DffModel {
 
     fn read_texture<R: Read + Seek>(reader: &mut R) -> Result<Texture, DffError> {
         let (_tex_type, tex_size, _tex_version) = Self::read_section_header(reader)?;
-        
+
         // Calculate texture end position to ensure we consume all bytes
         let tex_start_pos = reader.stream_position()?;
         let tex_end_pos = tex_start_pos + tex_size as u64;
@@ -787,11 +805,15 @@ impl DffModel {
         })
     }
 
-    fn read_material_effects<R: Read + Seek>(reader: &mut R, effects: &mut Vec<MaterialEffect>) -> Result<(), DffError> {
+    fn read_material_effects<R: Read + Seek>(
+        reader: &mut R,
+        effects: &mut Vec<MaterialEffect>,
+    ) -> Result<(), DffError> {
         let effect_type = Self::read_u32(reader)?;
 
         match effect_type {
-            1 => { // Bump map
+            1 => {
+                // Bump map
                 let intensity = Self::read_f32(reader)?;
                 let has_bump_texture = Self::read_u32(reader)?;
                 let bump_texture = if has_bump_texture != 0 {
@@ -812,7 +834,8 @@ impl DffModel {
                     height_texture,
                 }));
             }
-            2 => { // Environment map
+            2 => {
+                // Environment map
                 let coefficient = Self::read_f32(reader)?;
                 let use_fb_alpha = Self::read_u32(reader)? != 0;
                 let has_env_texture = Self::read_u32(reader)?;
@@ -828,7 +851,8 @@ impl DffModel {
                     env_texture,
                 }));
             }
-            4 => { // Dual texture
+            4 => {
+                // Dual texture
                 let src_blend = Self::read_blend_mode(reader)?;
                 let dst_blend = Self::read_blend_mode(reader)?;
                 let has_texture = Self::read_u32(reader)?;
@@ -871,7 +895,9 @@ impl DffModel {
         }
     }
 
-    fn read_specular_material<R: Read + Seek>(reader: &mut R) -> Result<SpecularMaterial, DffError> {
+    fn read_specular_material<R: Read + Seek>(
+        reader: &mut R,
+    ) -> Result<SpecularMaterial, DffError> {
         let level = Self::read_f32(reader)?;
         let has_texture = Self::read_u32(reader)?;
         let texture = if has_texture != 0 {
@@ -883,7 +909,9 @@ impl DffModel {
         Ok(SpecularMaterial { level, texture })
     }
 
-    fn read_reflection_material<R: Read + Seek>(reader: &mut R) -> Result<ReflectionMaterial, DffError> {
+    fn read_reflection_material<R: Read + Seek>(
+        reader: &mut R,
+    ) -> Result<ReflectionMaterial, DffError> {
         let scale_x = Self::read_f32(reader)?;
         let scale_y = Self::read_f32(reader)?;
         let offset_x = Self::read_f32(reader)?;
@@ -942,7 +970,8 @@ impl DffModel {
         let mut atomics = Vec::new();
 
         for _ in 0..num_atomics {
-            let (_atomic_section_type, _atomic_section_size, _atomic_rw_version) = Self::read_section_header(reader)?;
+            let (_atomic_section_type, _atomic_section_size, _atomic_rw_version) =
+                Self::read_section_header(reader)?;
 
             let frame = Self::read_u32(reader)?;
             let geometry = Self::read_u32(reader)?;
@@ -1007,7 +1036,9 @@ impl DffModel {
         let (section_type, _section_size, _) = Self::read_section_header(reader)?;
 
         if section_type != RW_SECTION_ANIMATION_ANIM {
-            return Err(DffError::InvalidFormat("Expected Animation Anim section".to_string()));
+            return Err(DffError::InvalidFormat(
+                "Expected Animation Anim section".to_string(),
+            ));
         }
 
         // Skip version (4 bytes)
@@ -1038,7 +1069,10 @@ impl DffModel {
             for i in 0..8 {
                 uv_values[i] = Self::read_f32(reader)?;
             }
-            frames.push(UVFrame { time, uv: uv_values });
+            frames.push(UVFrame {
+                time,
+                uv: uv_values,
+            });
         }
 
         Ok(UVAnimation {
@@ -1051,12 +1085,18 @@ impl DffModel {
         })
     }
 
-    fn read_native_geometry<R: Read + Seek>(reader: &mut R, _flags: u32) -> Result<PlatformNativeGeometry, DffError> {
+    fn read_native_geometry<R: Read + Seek>(
+        reader: &mut R,
+        _flags: u32,
+    ) -> Result<PlatformNativeGeometry, DffError> {
         // Read the native data PLG section
         let (section_type, section_size, _rw_version) = Self::read_section_header(reader)?;
 
-        if section_type != 0x0000050E { // Native Data PLG
-            return Err(DffError::InvalidFormat("Expected Native Data PLG section".to_string()));
+        if section_type != 0x0000050E {
+            // Native Data PLG
+            return Err(DffError::InvalidFormat(
+                "Expected Native Data PLG section".to_string(),
+            ));
         }
 
         let native_data_start = reader.stream_position()?;
@@ -1090,7 +1130,7 @@ impl DffModel {
             platform,
             vertex_data: native_data,
             index_data: Vec::new(), // TODO: Extract index data if present
-            shader_data: None, // TODO: Extract shader data if present
+            shader_data: None,      // TODO: Extract shader data if present
         })
     }
 

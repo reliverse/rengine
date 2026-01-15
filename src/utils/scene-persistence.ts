@@ -23,6 +23,13 @@ export interface SceneFileData {
     snapToGrid: boolean;
     gridSize: number;
     lightsVisible: boolean;
+    blueprintFiles?: Array<{
+      id: string;
+      name: string;
+      filePath: string | null;
+      isModified: boolean;
+      lastSavedAt?: string;
+    }>;
   };
 }
 
@@ -73,6 +80,10 @@ export function serializeScene(
       snapToGrid: sceneState.snapToGrid,
       gridSize: sceneState.gridSize,
       lightsVisible: sceneState.lightsVisible,
+      blueprintFiles: sceneState.blueprintFiles?.map((bp) => ({
+        ...bp,
+        lastSavedAt: bp.lastSavedAt?.toISOString(),
+      })),
     },
   };
 }
@@ -88,7 +99,7 @@ export function deserializeScene(fileData: SceneFileData): Partial<SceneState> {
     );
   }
 
-  return {
+  const result: Partial<SceneState> = {
     objects: fileData.scene.objects,
     lights: fileData.scene.lights || [], // Fallback for older files without lights
     cameraPosition: fileData.scene.cameraPosition,
@@ -98,6 +109,19 @@ export function deserializeScene(fileData: SceneFileData): Partial<SceneState> {
     gridSize: fileData.scene.gridSize,
     lightsVisible: fileData.scene.lightsVisible ?? true, // Default to visible
   };
+
+  // Add blueprintFiles if present
+  if (fileData.scene.blueprintFiles) {
+    result.blueprintFiles = fileData.scene.blueprintFiles.map((bp) => ({
+      id: bp.id,
+      name: bp.name,
+      filePath: bp.filePath,
+      isModified: bp.isModified,
+      lastSavedAt: bp.lastSavedAt ? new Date(bp.lastSavedAt) : undefined,
+    })) as SceneState["blueprintFiles"];
+  }
+
+  return result;
 }
 
 /**

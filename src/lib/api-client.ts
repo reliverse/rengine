@@ -306,7 +306,6 @@ function createApiError(
   return error;
 }
 
-// biome-ignore lint/suspicious/useAwait: This function is intentionally async for use with await
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
