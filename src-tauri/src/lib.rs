@@ -1,15 +1,16 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
-pub mod renderware;
+pub mod blueprint;
 pub mod models;
+pub mod renderware;
 
+use crate::renderware::img::ImgArchive;
 use base64::{engine::general_purpose, Engine as _};
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
-use std::collections::HashSet;
-use crate::renderware::img::ImgArchive;
 use photon_rs::native::{open_image, save_image};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::fs::read_dir;
 use std::io::Read;
@@ -143,7 +144,7 @@ lazy_static::lazy_static! {
     static ref SAMP_MODEL_DATABASE: crate::models::SampModelDatabase = {
         match crate::models::SampModelDatabase::load_from_embedded_csv() {
             Ok(db) => {
-                println!("Loaded {} SA:MP models from embedded CSV", db.len());
+                // println!("Loaded {} SA:MP models from embedded CSV", db.len());
                 db
             }
             Err(e) => {
@@ -906,16 +907,18 @@ async fn load_img_archive(path: String) -> Result<crate::renderware::img::ImgArc
 }
 
 #[tauri::command]
-async fn extract_img_entry(archive_path: String, entry_name: String, output_path: String) -> Result<(), String> {
+async fn extract_img_entry(
+    archive_path: String,
+    entry_name: String,
+    output_path: String,
+) -> Result<(), String> {
     use crate::renderware::img::ImgArchive;
 
     match ImgArchive::load_from_path(&archive_path) {
-        Ok(archive) => {
-            match archive.extract_entry(&entry_name, &output_path) {
-                Ok(()) => Ok(()),
-                Err(e) => Err(format!("Failed to extract entry '{}': {}", entry_name, e)),
-            }
-        }
+        Ok(archive) => match archive.extract_entry(&entry_name, &output_path) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(format!("Failed to extract entry '{}': {}", entry_name, e)),
+        },
         Err(e) => Err(format!("Failed to load IMG archive: {}", e)),
     }
 }
@@ -933,7 +936,9 @@ struct ImgOperation {
 }
 
 #[tauri::command]
-async fn batch_extract_img_entries(request: BatchExtractRequest) -> Result<Vec<crate::renderware::img::OperationResult>, String> {
+async fn batch_extract_img_entries(
+    request: BatchExtractRequest,
+) -> Result<Vec<crate::renderware::img::OperationResult>, String> {
     use crate::renderware::img::{ImgArchive, OperationResult};
 
     let mut results = Vec::new();
@@ -941,18 +946,19 @@ async fn batch_extract_img_entries(request: BatchExtractRequest) -> Result<Vec<c
     match ImgArchive::load_from_path(&request.archive_path) {
         Ok(archive) => {
             for operation in &request.operations {
-                let result = match archive.extract_entry(&operation.entry_name, &operation.output_path) {
-                    Ok(()) => OperationResult {
-                        entry_name: operation.entry_name.clone(),
-                        success: true,
-                        error: None,
-                    },
-                    Err(e) => OperationResult {
-                        entry_name: operation.entry_name.clone(),
-                        success: false,
-                        error: Some(format!("Failed to extract entry: {}", e)),
-                    },
-                };
+                let result =
+                    match archive.extract_entry(&operation.entry_name, &operation.output_path) {
+                        Ok(()) => OperationResult {
+                            entry_name: operation.entry_name.clone(),
+                            success: true,
+                            error: None,
+                        },
+                        Err(e) => OperationResult {
+                            entry_name: operation.entry_name.clone(),
+                            success: false,
+                            error: Some(format!("Failed to extract entry: {}", e)),
+                        },
+                    };
                 results.push(result);
             }
         }
@@ -1007,10 +1013,11 @@ async fn import_via_ide(request: ImportViaIdeRequest) -> Result<ImportViaIdeResu
     };
 
     // Parse IDE file to extract model and texture references
-    let (models, textures): (HashSet<String>, HashSet<String>) = match parse_ide_file(&request.ide_file_path) {
-        Ok(result) => result,
-        Err(e) => return Err(format!("Failed to parse IDE file: {}", e)),
-    };
+    let (models, textures): (HashSet<String>, HashSet<String>) =
+        match parse_ide_file(&request.ide_file_path) {
+            Ok(result) => result,
+            Err(e) => return Err(format!("Failed to parse IDE file: {}", e)),
+        };
 
     if models.is_empty() && textures.is_empty() {
         return Ok(ImportViaIdeResult {
@@ -1030,9 +1037,13 @@ async fn import_via_ide(request: ImportViaIdeRequest) -> Result<ImportViaIdeResu
     }
 
     // Determine models directory
-    let models_directory = request.models_directory
-        .unwrap_or_else(|| Path::new(&request.ide_file_path).parent()
-            .unwrap_or(Path::new(".")).to_string_lossy().to_string());
+    let models_directory = request.models_directory.unwrap_or_else(|| {
+        Path::new(&request.ide_file_path)
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_string_lossy()
+            .to_string()
+    });
 
     let mut imported_entries = Vec::new();
     let mut failed_files = Vec::new();
@@ -1123,12 +1134,10 @@ async fn restore_img_entry(archive_path: String, entry_name: String) -> Result<(
     use crate::renderware::img::ImgArchive;
 
     match ImgArchive::load_from_path(&archive_path) {
-        Ok(mut archive) => {
-            match archive.restore_entry(&entry_name) {
-                Ok(()) => Ok(()),
-                Err(e) => Err(format!("Failed to restore entry '{}': {}", entry_name, e)),
-            }
-        }
+        Ok(mut archive) => match archive.restore_entry(&entry_name) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(format!("Failed to restore entry '{}': {}", entry_name, e)),
+        },
         Err(e) => Err(format!("Failed to load IMG archive: {}", e)),
     }
 }
@@ -1250,19 +1259,28 @@ async fn parse_pwn_file(file_path: String) -> Result<PwnImportResult, String> {
     use std::io::Read;
 
     // Read the PWN file
-    let mut file = File::open(&file_path).map_err(|e| {
-        format!("Failed to open PWN file {}: {}", file_path, e)
-    })?;
+    let mut file = File::open(&file_path)
+        .map_err(|e| format!("Failed to open PWN file {}: {}", file_path, e))?;
 
     let mut content = String::new();
-    file.read_to_string(&mut content).map_err(|e| {
-        format!("Failed to read PWN file {}: {}", file_path, e)
+    file.read_to_string(&mut content)
+        .map_err(|e| format!("Failed to read PWN file {}: {}", file_path, e))?;
+
+    // Remove multi-line comments first
+    let multiline_comment_re = Regex::new(r"/\*[\s\S]*?\*/")
+        .map_err(|e| format!("Failed to create multiline comment regex: {}", e))?;
+    let content = multiline_comment_re.replace_all(&content, "");
+
+    // Regex patterns to match CreateDynamicObject calls in both formats
+    // Positional format: CreateDynamicObject(modelid, x, y, z, rx, ry, rz[, worldid, interiorid, playerid, streamdistance, drawdistance, areaid, priority]);
+    // Named format: CreateDynamicObject(modelid, x, y, z, rx, ry, rz[, worldid = value, interiorid = value, playerid = value, streamdistance = value, drawdistance = value, areaid = value, priority = value]);
+    // Basic parameters (modelid, x, y, z, rx, ry, rz) are required, optional parameters in [] can be omitted
+    let positional_re = Regex::new(r"CreateDynamicObject\s*\(\s*(\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*(\d+))?\s*\)\s*;").map_err(|e| {
+        format!("Failed to create positional regex pattern: {}", e)
     })?;
 
-    // Regex pattern to match CreateDynamicObject calls
-    // Format: CreateDynamicObject(modelid, Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz, worldid = value, interiorid = value, playerid = value, Float:streamdistance = value, Float:drawdistance = value, areaid = value, priority = value);
-    let re = Regex::new(r"CreateDynamicObject\s*\(\s*(\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*,\s*Float\s*:\s*([+-]?\d*\.?\d+)\s*(?:,\s*worldid\s*=\s*([+-]?\d+))?\s*(?:,\s*interiorid\s*=\s*([+-]?\d+))?\s*(?:,\s*playerid\s*=\s*([+-]?\d+))?\s*(?:,\s*Float\s*:\s*streamdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*Float\s*:\s*drawdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*areaid\s*=\s*([+-]?\d+))?\s*(?:,\s*priority\s*=\s*(\d+))?\s*\)\s*;").map_err(|e| {
-        format!("Failed to create regex pattern: {}", e)
+    let named_re = Regex::new(r"CreateDynamicObject\s*\(\s*(\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*(?:,\s*worldid\s*=\s*([+-]?\d+))?\s*(?:,\s*interiorid\s*=\s*([+-]?\d+))?\s*(?:,\s*playerid\s*=\s*([+-]?\d+))?\s*(?:,\s*streamdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*drawdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*areaid\s*=\s*([+-]?\d+))?\s*(?:,\s*priority\s*=\s*(\d+))?\s*\)\s*;").map_err(|e| {
+        format!("Failed to create named regex pattern: {}", e)
     })?;
 
     let mut objects = Vec::new();
@@ -1273,24 +1291,45 @@ async fn parse_pwn_file(file_path: String) -> Result<PwnImportResult, String> {
     for (line_num, line) in lines.iter().enumerate() {
         let line = line.trim();
 
-        // Skip empty lines and comments
-        if line.is_empty() || line.starts_with("//") || line.starts_with("#") {
+        // Skip empty lines, single-line comments, includes, and other non-relevant content
+        if line.is_empty()
+            || line.starts_with("//")
+            || line.starts_with("#")
+            || line.starts_with("/*")
+            || line.starts_with("*")
+            || line.ends_with("*/")
+            || line.contains("hook ")
+            || line.contains("function ")
+            || line.contains("stock ")
+            || line.contains("public ")
+            || line.contains("return ")
+            || line.starts_with("{")
+            || line.starts_with("}")
+            || line.starts_with(")")
+            || (!line.contains("CreateDynamicObject") && !line.contains("createDynamicObject"))
+        {
             continue;
         }
 
-        if let Some(captures) = re.captures(line) {
-            match parse_create_dynamic_object(&captures) {
-                Ok(obj) => {
-                    objects.push(obj);
-                    parsed_count += 1;
-                }
-                Err(e) => {
-                    errors.push(format!("Line {}: {}", line_num + 1, e));
-                }
+        // Try positional format first, then named format
+        let (captures, is_positional) = if let Some(cap) = positional_re.captures(line) {
+            (cap, true)
+        } else if let Some(cap) = named_re.captures(line) {
+            (cap, false)
+        } else {
+            // Don't report errors for lines that don't contain CreateDynamicObject calls
+            // This allows the parser to be more robust and ignore irrelevant content
+            continue;
+        };
+
+        match parse_create_dynamic_object(&captures, is_positional) {
+            Ok(obj) => {
+                objects.push(obj);
+                parsed_count += 1;
             }
-        } else if !line.is_empty() && !line.starts_with("//") && !line.starts_with("#") {
-            // Only report errors for non-empty, non-comment lines that don't match
-            errors.push(format!("Line {}: Invalid CreateDynamicObject syntax", line_num + 1));
+            Err(e) => {
+                errors.push(format!("Line {}: {}", line_num + 1, e));
+            }
         }
     }
 
@@ -1302,13 +1341,18 @@ async fn parse_pwn_file(file_path: String) -> Result<PwnImportResult, String> {
     })
 }
 
-fn parse_create_dynamic_object(captures: &regex::Captures) -> Result<PwnObjectData, String> {
+fn parse_create_dynamic_object(
+    captures: &regex::Captures,
+    is_positional: bool,
+) -> Result<PwnObjectData, String> {
     // Helper function to parse float values, handling constants
     fn parse_float_or_constant(value: &str) -> Result<f32, String> {
         match value.to_uppercase().as_str() {
             "STREAMER_OBJECT_SD" => Ok(200.0), // Default stream distance
             "STREAMER_OBJECT_DD" => Ok(0.0),   // Default draw distance
-            _ => value.parse::<f32>().map_err(|_| format!("Invalid float value: {}", value))
+            _ => value
+                .parse::<f32>()
+                .map_err(|_| format!("Invalid float value: {}", value)),
         }
     }
 
@@ -1316,10 +1360,13 @@ fn parse_create_dynamic_object(captures: &regex::Captures) -> Result<PwnObjectDa
     fn parse_optional_i32(value: Option<&regex::Match>) -> Result<Option<i32>, String> {
         match value {
             Some(m) => {
-                let val = m.as_str().parse::<i32>().map_err(|_| format!("Invalid integer value: {}", m.as_str()))?;
+                let val = m
+                    .as_str()
+                    .parse::<i32>()
+                    .map_err(|_| format!("Invalid integer value: {}", m.as_str()))?;
                 Ok(Some(val))
             }
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
@@ -1330,7 +1377,7 @@ fn parse_create_dynamic_object(captures: &regex::Captures) -> Result<PwnObjectDa
                 let val = parse_float_or_constant(m.as_str())?;
                 Ok(Some(val))
             }
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
@@ -1338,14 +1385,21 @@ fn parse_create_dynamic_object(captures: &regex::Captures) -> Result<PwnObjectDa
     fn parse_optional_u32(value: Option<&regex::Match>) -> Result<Option<u32>, String> {
         match value {
             Some(m) => {
-                let val = m.as_str().parse::<u32>().map_err(|_| format!("Invalid unsigned integer value: {}", m.as_str()))?;
+                let val = m
+                    .as_str()
+                    .parse::<u32>()
+                    .map_err(|_| format!("Invalid unsigned integer value: {}", m.as_str()))?;
                 Ok(Some(val))
             }
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
-    let modelid = captures.get(1).unwrap().as_str().parse::<u32>()
+    let modelid = captures
+        .get(1)
+        .unwrap()
+        .as_str()
+        .parse::<u32>()
         .map_err(|_| "Invalid model ID")?;
 
     let x = parse_float_or_constant(captures.get(2).unwrap().as_str())?;
@@ -1355,13 +1409,31 @@ fn parse_create_dynamic_object(captures: &regex::Captures) -> Result<PwnObjectDa
     let ry = parse_float_or_constant(captures.get(6).unwrap().as_str())?;
     let rz = parse_float_or_constant(captures.get(7).unwrap().as_str())?;
 
-    let worldid = parse_optional_i32(captures.get(8).as_ref())?;
-    let interiorid = parse_optional_i32(captures.get(9).as_ref())?;
-    let playerid = parse_optional_i32(captures.get(10).as_ref())?;
-    let streamdistance = parse_optional_f32(captures.get(11).as_ref())?;
-    let drawdistance = parse_optional_f32(captures.get(12).as_ref())?;
-    let areaid = parse_optional_i32(captures.get(13).as_ref())?;
-    let priority = parse_optional_u32(captures.get(14).as_ref())?;
+    // Parse parameters based on format
+    let (worldid, interiorid, playerid, streamdistance, drawdistance, areaid, priority) =
+        if is_positional {
+            // Positional format: modelid, x, y, z, rx, ry, rz, worldid, interiorid, playerid, streamdistance, drawdistance, areaid, priority
+            (
+                parse_optional_i32(captures.get(8).as_ref())?,
+                parse_optional_i32(captures.get(9).as_ref())?,
+                parse_optional_i32(captures.get(10).as_ref())?,
+                parse_optional_f32(captures.get(11).as_ref())?,
+                parse_optional_f32(captures.get(12).as_ref())?,
+                parse_optional_i32(captures.get(13).as_ref())?,
+                parse_optional_u32(captures.get(14).as_ref())?,
+            )
+        } else {
+            // Named format: modelid, x, y, z, rx, ry, rz, worldid = value, interiorid = value, playerid = value, streamdistance = value, drawdistance = value, areaid = value, priority = value
+            (
+                parse_optional_i32(captures.get(8).as_ref())?,
+                parse_optional_i32(captures.get(9).as_ref())?,
+                parse_optional_i32(captures.get(10).as_ref())?,
+                parse_optional_f32(captures.get(11).as_ref())?,
+                parse_optional_f32(captures.get(12).as_ref())?,
+                parse_optional_i32(captures.get(13).as_ref())?,
+                parse_optional_u32(captures.get(14).as_ref())?,
+            )
+        };
 
     Ok(PwnObjectData {
         modelid,
@@ -1386,8 +1458,7 @@ fn parse_ide_file(ide_path: &str) -> Result<(HashSet<String>, HashSet<String>), 
     use std::fs::File;
     use std::io::Read;
 
-    let mut file = File::open(ide_path)
-        .map_err(|e| format!("Failed to open IDE file: {}", e))?;
+    let mut file = File::open(ide_path).map_err(|e| format!("Failed to open IDE file: {}", e))?;
 
     let mut content = String::new();
     file.read_to_string(&mut content)
@@ -1438,14 +1509,19 @@ fn find_file_in_directory(directory: &str, filename: &str) -> Option<String> {
 }
 
 // Helper function to import file to archive
-fn import_file_to_archive(archive: &mut ImgArchive, file_path: &str, entry_name: &str) -> Result<(), String> {
+fn import_file_to_archive(
+    archive: &mut ImgArchive,
+    file_path: &str,
+    entry_name: &str,
+) -> Result<(), String> {
     use std::fs;
 
-    let data = fs::read(file_path)
-        .map_err(|e| format!("Failed to read file {}: {}", file_path, e))?;
+    let data =
+        fs::read(file_path).map_err(|e| format!("Failed to read file {}: {}", file_path, e))?;
 
     // Add entry to archive (this is in-memory operation)
-    archive.add_entry(entry_name, &data)
+    archive
+        .add_entry(entry_name, &data)
         .map_err(|e| format!("Failed to add entry to archive: {}", e))?;
 
     Ok(())
@@ -1454,6 +1530,7 @@ fn import_file_to_archive(archive: &mut ImgArchive, file_path: &str, entry_name:
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -1494,38 +1571,89 @@ pub fn run() {
             get_samp_model_by_id,
             get_samp_model_by_name,
             search_samp_models_by_name,
-            get_all_samp_models_count
+            get_all_samp_models_count,
+            parse_blueprint_code,
+            generate_blueprint_code
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 
-// SA:MP Model Database Commands
-#[tauri::command]
-fn get_samp_model_by_id(id: u32) -> Result<Option<crate::models::SampModel>, String> {
-    Ok(SAMP_MODEL_DATABASE.get_model_by_id(id).cloned())
-}
+    // SA:MP Model Database Commands
+    #[tauri::command]
+    fn get_samp_model_by_id(id: u32) -> Result<Option<crate::models::SampModel>, String> {
+        Ok(SAMP_MODEL_DATABASE.get_model_by_id(id).cloned())
+    }
 
-#[tauri::command]
-fn get_samp_model_by_name(name: String) -> Result<Option<crate::models::SampModel>, String> {
-    Ok(SAMP_MODEL_DATABASE.get_model_by_name(&name).cloned())
-}
+    #[tauri::command]
+    fn get_samp_model_by_name(name: String) -> Result<Option<crate::models::SampModel>, String> {
+        Ok(SAMP_MODEL_DATABASE.get_model_by_name(&name).cloned())
+    }
 
-#[tauri::command]
-fn search_samp_models_by_name(query: String, limit: Option<usize>) -> Result<Vec<crate::models::SampModel>, String> {
-    let limit = limit.unwrap_or(10);
-    let models = if query.len() <= 2 {
-        // For short queries, use prefix search
-        SAMP_MODEL_DATABASE.find_models_by_name_prefix(&query, limit)
-    } else {
-        // For longer queries, use contains search
-        SAMP_MODEL_DATABASE.find_models_by_name_contains(&query, limit)
-    };
+    #[tauri::command]
+    fn search_samp_models_by_name(
+        query: String,
+        limit: Option<usize>,
+    ) -> Result<Vec<crate::models::SampModel>, String> {
+        let limit = limit.unwrap_or(10);
+        let models = if query.len() <= 2 {
+            // For short queries, use prefix search
+            SAMP_MODEL_DATABASE.find_models_by_name_prefix(&query, limit)
+        } else {
+            // For longer queries, use contains search
+            SAMP_MODEL_DATABASE.find_models_by_name_contains(&query, limit)
+        };
 
-    Ok(models.into_iter().cloned().collect())
-}
+        Ok(models.into_iter().cloned().collect())
+    }
 
-#[tauri::command]
-fn get_all_samp_models_count() -> Result<usize, String> {
-    Ok(SAMP_MODEL_DATABASE.len())
-}
+    #[tauri::command]
+    fn get_all_samp_models_count() -> Result<usize, String> {
+        Ok(SAMP_MODEL_DATABASE.len())
+    }
+
+    #[tauri::command]
+    async fn parse_blueprint_code(
+        source: String,
+        language: String,
+    ) -> Result<serde_json::Value, String> {
+        use crate::blueprint::parser::Parser as ParserTrait;
+        use crate::blueprint::PawnParser;
+
+        match language.as_str() {
+            "pawn" => {
+                let parser = PawnParser::new();
+                let result = parser.parse(&source)?;
+                Ok(serde_json::json!({
+                    "ast": result.ast,
+                    "errors": result.errors,
+                    "warnings": result.warnings,
+                    "language": parser.language()
+                }))
+            }
+            _ => Err(format!("Unsupported language: {}", language)),
+        }
+    }
+
+    #[tauri::command]
+    async fn generate_blueprint_code(
+        ast: serde_json::Value,
+        language: String,
+        options: Option<serde_json::Value>,
+    ) -> Result<String, String> {
+        use crate::blueprint::{GenerationOptions, PawnGenerator};
+
+        match language.as_str() {
+            "pawn" => {
+                let gen_options = if let Some(opts) = options {
+                    serde_json::from_value(opts).unwrap_or_default()
+                } else {
+                    GenerationOptions::default()
+                };
+
+                let generator = PawnGenerator::with_options(gen_options);
+                generator.generate(&ast)
+            }
+            _ => Err(format!("Unsupported language: {}", language)),
+        }
+    }
 }

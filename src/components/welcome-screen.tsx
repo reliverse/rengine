@@ -20,7 +20,7 @@ import {
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { useAuth } from "~/contexts/auth-context";
 import { useSceneStore } from "~/stores/scene-store";
-import { loadScene } from "~/utils/scene-persistence";
+import { loadScene, deserializeScene } from "~/utils/scene-persistence";
 
 interface SceneTemplate {
   id: string;
@@ -174,7 +174,8 @@ export function WelcomeScreen() {
 
     if (result.success && result.data) {
       const sceneState = useSceneStore.getState();
-      sceneState.loadScene(result.data.scene);
+      const deserialized = deserializeScene(result.data);
+      sceneState.loadScene(deserialized);
       sceneState.setSceneMetadata({
         name: result.data.metadata.name,
       });

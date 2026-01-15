@@ -1,7 +1,7 @@
+use crate::RengineError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use crate::RengineError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdeColumn {
@@ -84,8 +84,8 @@ pub struct IdeParser {
 
 impl IdeParser {
     pub fn new(schema_json: &str) -> Result<Self, RengineError> {
-        let schema: IdeSchema = serde_json::from_str(schema_json)
-            .map_err(|e| RengineError::ParseError {
+        let schema: IdeSchema =
+            serde_json::from_str(schema_json).map_err(|e| RengineError::ParseError {
                 path: "schema".to_string(),
                 details: format!("Failed to parse IDE schema: {}", e),
             })?;
@@ -94,26 +94,32 @@ impl IdeParser {
     }
 
     pub fn parse_file(&self, file_path: &str) -> Result<IdeDocument, RengineError> {
-        let content = fs::read_to_string(file_path)
-            .map_err(|e| RengineError::FileReadFailed {
-                path: file_path.to_string(),
-                details: e.to_string(),
-            })?;
+        let content = fs::read_to_string(file_path).map_err(|e| RengineError::FileReadFailed {
+            path: file_path.to_string(),
+            details: e.to_string(),
+        })?;
 
         self.parse_content(&content, file_path)
     }
 
-    pub fn parse_content(&self, content: &str, file_path: &str) -> Result<IdeDocument, RengineError> {
+    pub fn parse_content(
+        &self,
+        content: &str,
+        file_path: &str,
+    ) -> Result<IdeDocument, RengineError> {
         let lines: Vec<&str> = content.lines().collect();
         let mut parsed_data: HashMap<String, IdeSectionData> = HashMap::new();
         let mut current_section: Option<String> = None;
 
         // Initialize all sections from schema
         for section_key in self.schema.sections.keys() {
-            parsed_data.insert(section_key.clone(), IdeSectionData {
-                rows: Vec::new(),
-                errors: Vec::new(),
-            });
+            parsed_data.insert(
+                section_key.clone(),
+                IdeSectionData {
+                    rows: Vec::new(),
+                    errors: Vec::new(),
+                },
+            );
         }
 
         for line in lines {
@@ -173,7 +179,10 @@ impl IdeParser {
         if let Some(parse_hints) = &schema_section.parse_hints {
             if parse_hints.contains_key("note") {
                 // Store as raw for complex sections like path
-                row_data.insert("raw".to_string(), serde_json::Value::String(line.to_string()));
+                row_data.insert(
+                    "raw".to_string(),
+                    serde_json::Value::String(line.to_string()),
+                );
                 section_data.rows.push(IdeRow {
                     data: row_data,
                     extra_fields: None,
@@ -194,7 +203,10 @@ impl IdeParser {
                     row_data.insert(col_name.clone(), value);
                 }
                 Err(e) => {
-                    let error_msg = format!("Error parsing column '{}' in line '{}': {}", col_name, line, e);
+                    let error_msg = format!(
+                        "Error parsing column '{}' in line '{}': {}",
+                        col_name, line, e
+                    );
                     section_data.errors.push(error_msg);
                     col_index += 1;
                     continue;
@@ -238,14 +250,17 @@ impl IdeParser {
                     }
                 }
 
-                let items_type = col_schema.items_type.as_ref()
+                let items_type = col_schema
+                    .items_type
+                    .as_ref()
                     .map(|s| s.as_str())
                     .unwrap_or("string");
 
                 let end_slice = std::cmp::min(*token_index + count, tokens.len());
                 let array_tokens = &tokens[*token_index..end_slice];
 
-                let array_values: Vec<serde_json::Value> = array_tokens.iter()
+                let array_values: Vec<serde_json::Value> = array_tokens
+                    .iter()
                     .map(|token| self.parse_single_value(items_type, token))
                     .collect::<Result<Vec<_>, _>>()?;
 
@@ -263,18 +278,24 @@ impl IdeParser {
         }
     }
 
-    fn parse_single_value(&self, value_type: &str, token: &str) -> Result<serde_json::Value, String> {
+    fn parse_single_value(
+        &self,
+        value_type: &str,
+        token: &str,
+    ) -> Result<serde_json::Value, String> {
         match value_type {
-            "int" => {
-                token.parse::<i64>()
-                    .map(|n| serde_json::Value::Number(n.into()))
-                    .map_err(|e| format!("Invalid integer '{}': {}", token, e))
-            }
-            "float" => {
-                token.parse::<f64>()
-                    .map(|n| serde_json::Value::Number(serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0))))
-                    .map_err(|e| format!("Invalid float '{}': {}", token, e))
-            }
+            "int" => token
+                .parse::<i64>()
+                .map(|n| serde_json::Value::Number(n.into()))
+                .map_err(|e| format!("Invalid integer '{}': {}", token, e)),
+            "float" => token
+                .parse::<f64>()
+                .map(|n| {
+                    serde_json::Value::Number(
+                        serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0)),
+                    )
+                })
+                .map_err(|e| format!("Invalid float '{}': {}", token, e)),
             "string" => Ok(serde_json::Value::String(token.to_string())),
             _ => Ok(serde_json::Value::String(token.to_string())),
         }
@@ -380,7 +401,13 @@ mod tests {
 
         let result = parser.parse_content(&content, "test.ide").unwrap();
         assert_eq!(result.sections["objs"].rows.len(), 1);
-        assert_eq!(result.sections["objs"].rows[0].data["id"], serde_json::json!(123));
-        assert_eq!(result.sections["objs"].rows[0].data["modelName"], serde_json::json!("testmodel"));
+        assert_eq!(
+            result.sections["objs"].rows[0].data["id"],
+            serde_json::json!(123)
+        );
+        assert_eq!(
+            result.sections["objs"].rows[0].data["modelName"],
+            serde_json::json!("testmodel")
+        );
     }
 }

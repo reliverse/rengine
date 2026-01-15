@@ -134,7 +134,9 @@ pub struct Effects2DFX {
 impl Effects2DFX {
     pub fn load_from_data(data: &[u8]) -> Result<Self, DfxError> {
         if data.len() < 4 {
-            return Err(DfxError::InvalidFormat("Data too short for 2DFX".to_string()));
+            return Err(DfxError::InvalidFormat(
+                "Data too short for 2DFX".to_string(),
+            ));
         }
 
         let entries_count = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
@@ -147,13 +149,13 @@ impl Effects2DFX {
             }
 
             let position = Vector3 {
-                x: f32::from_le_bytes(data[pos..pos+4].try_into().unwrap()),
-                y: f32::from_le_bytes(data[pos+4..pos+8].try_into().unwrap()),
-                z: f32::from_le_bytes(data[pos+8..pos+12].try_into().unwrap()),
+                x: f32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()),
+                y: f32::from_le_bytes(data[pos + 4..pos + 8].try_into().unwrap()),
+                z: f32::from_le_bytes(data[pos + 8..pos + 12].try_into().unwrap()),
             };
 
-            let effect_type = u32::from_le_bytes(data[pos+12..pos+16].try_into().unwrap());
-            let size = u32::from_le_bytes(data[pos+16..pos+20].try_into().unwrap()) as usize;
+            let effect_type = u32::from_le_bytes(data[pos + 12..pos + 16].try_into().unwrap());
+            let size = u32::from_le_bytes(data[pos + 16..pos + 20].try_into().unwrap()) as usize;
 
             pos += 20;
 
@@ -164,7 +166,8 @@ impl Effects2DFX {
             let effect_data = &data[pos..pos + size];
 
             match effect_type {
-                0 => { // Light
+                0 => {
+                    // Light
                     if effect_data.len() >= 76 {
                         let color = Color {
                             r: effect_data[0],
@@ -173,10 +176,14 @@ impl Effects2DFX {
                             a: effect_data[3],
                         };
 
-                        let corona_far_clip = f32::from_le_bytes(effect_data[4..8].try_into().unwrap());
-                        let pointlight_range = f32::from_le_bytes(effect_data[8..12].try_into().unwrap());
-                        let corona_size = f32::from_le_bytes(effect_data[12..16].try_into().unwrap());
-                        let shadow_size = f32::from_le_bytes(effect_data[16..20].try_into().unwrap());
+                        let corona_far_clip =
+                            f32::from_le_bytes(effect_data[4..8].try_into().unwrap());
+                        let pointlight_range =
+                            f32::from_le_bytes(effect_data[8..12].try_into().unwrap());
+                        let corona_size =
+                            f32::from_le_bytes(effect_data[12..16].try_into().unwrap());
+                        let shadow_size =
+                            f32::from_le_bytes(effect_data[16..20].try_into().unwrap());
                         let corona_show_mode = effect_data[20];
                         let corona_enable_reflection = effect_data[21];
                         let corona_flare_type = effect_data[22];
@@ -218,18 +225,22 @@ impl Effects2DFX {
                         }));
                     }
                 }
-                1 => { // Particle
+                1 => {
+                    // Particle
                     let particle_type = String::from_utf8_lossy(effect_data).to_string();
                     effects.push(Effect2DFX::Particle(ParticleEffect {
                         position,
                         particle_type,
                     }));
                 }
-                3 => { // Ped Attractor
+                3 => {
+                    // Ped Attractor
                     if effect_data.len() >= 28 {
                         let attractor_type = effect_data[0];
-                        let queue_direction_x = f32::from_le_bytes(effect_data[1..5].try_into().unwrap());
-                        let queue_direction_y = f32::from_le_bytes(effect_data[5..9].try_into().unwrap());
+                        let queue_direction_x =
+                            f32::from_le_bytes(effect_data[1..5].try_into().unwrap());
+                        let queue_direction_y =
+                            f32::from_le_bytes(effect_data[5..9].try_into().unwrap());
                         let external_script = Self::read_string(&effect_data[9..25]);
                         let unknown1 = u16::from_le_bytes(effect_data[25..27].try_into().unwrap());
                         let unknown2 = u16::from_le_bytes(effect_data[27..29].try_into().unwrap());
@@ -245,17 +256,19 @@ impl Effects2DFX {
                         }));
                     }
                 }
-                4 => { // Sun Glare
-                    effects.push(Effect2DFX::SunGlare(SunGlareEffect {
-                        position,
-                    }));
+                4 => {
+                    // Sun Glare
+                    effects.push(Effect2DFX::SunGlare(SunGlareEffect { position }));
                 }
-                6 => { // Enter/Exit
+                6 => {
+                    // Enter/Exit
                     if effect_data.len() >= 44 {
                         let enter_angle = f32::from_le_bytes(effect_data[0..4].try_into().unwrap());
-                        let approach_angle = f32::from_le_bytes(effect_data[4..8].try_into().unwrap());
+                        let approach_angle =
+                            f32::from_le_bytes(effect_data[4..8].try_into().unwrap());
                         let exit_angle = f32::from_le_bytes(effect_data[8..12].try_into().unwrap());
-                        let interior_id = u16::from_le_bytes(effect_data[12..14].try_into().unwrap());
+                        let interior_id =
+                            u16::from_le_bytes(effect_data[12..14].try_into().unwrap());
                         let flags = effect_data[14];
                         let name = Self::read_string(&effect_data[15..39]);
                         let time_on = effect_data[39];
@@ -274,7 +287,8 @@ impl Effects2DFX {
                         }));
                     }
                 }
-                7 => { // Road Sign
+                7 => {
+                    // Road Sign
                     if effect_data.len() >= 26 {
                         let size_x = f32::from_le_bytes(effect_data[0..4].try_into().unwrap());
                         let size_y = f32::from_le_bytes(effect_data[4..8].try_into().unwrap());
@@ -292,7 +306,8 @@ impl Effects2DFX {
                         }));
                     }
                 }
-                8 => { // Trigger Point
+                8 => {
+                    // Trigger Point
                     if effect_data.len() >= 2 {
                         let point_id = u16::from_le_bytes(effect_data[0..2].try_into().unwrap());
                         effects.push(Effect2DFX::TriggerPoint(TriggerPointEffect {
@@ -301,11 +316,13 @@ impl Effects2DFX {
                         }));
                     }
                 }
-                9 => { // Cover Point
+                9 => {
+                    // Cover Point
                     if effect_data.len() >= 13 {
                         let direction_x = f32::from_le_bytes(effect_data[0..4].try_into().unwrap());
                         let direction_y = f32::from_le_bytes(effect_data[4..8].try_into().unwrap());
-                        let direction_z = f32::from_le_bytes(effect_data[8..12].try_into().unwrap());
+                        let direction_z =
+                            f32::from_le_bytes(effect_data[8..12].try_into().unwrap());
                         let type_ = effect_data[12];
 
                         effects.push(Effect2DFX::CoverPoint(CoverPointEffect {
@@ -317,7 +334,8 @@ impl Effects2DFX {
                         }));
                     }
                 }
-                10 => { // Escalator
+                10 => {
+                    // Escalator
                     if effect_data.len() >= 37 {
                         let bottom = Vector3 {
                             x: f32::from_le_bytes(effect_data[0..4].try_into().unwrap()),

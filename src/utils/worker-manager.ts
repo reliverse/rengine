@@ -112,11 +112,11 @@ export class WorkerManager {
         id,
       };
 
-      this.worker?.postMessage(message);
-
-      // Transfer ArrayBuffer ownership to worker for better performance
+      // Only post message once - either with transfer or without
       if (type !== "obj" && data instanceof ArrayBuffer) {
         this.worker?.postMessage(message, [data]);
+      } else {
+        this.worker?.postMessage(message);
       }
     });
   }
@@ -176,11 +176,6 @@ export class WorkerManager {
                 stage: "Optimizing model",
               });
 
-              // Log supported extensions for debugging
-              if (gltf.parser?.extensions) {
-                console.log("GLTF extensions:", gltf.parser.extensions);
-              }
-
               // Validate extensions
               const validation = validateGLTFExtensions(gltf);
 
@@ -190,6 +185,7 @@ export class WorkerManager {
 
               // Optimize model like in worker
               optimizeModel(gltf.scene);
+
               // Return transferable data format
               resolve({
                 object: gltf.scene.toJSON(),

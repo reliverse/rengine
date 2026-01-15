@@ -91,11 +91,11 @@ const validateFile = (
     }
   }
 
-  const maxFileSize = 50 * 1024 * 1024; // 50MB limit
+  const maxFileSize = 100 * 1024 * 1024; // 100MB limit
   if (file.size > maxFileSize) {
     return {
       valid: false,
-      error: `File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds maximum limit of 50MB`,
+      error: `File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds maximum limit of 100MB`,
       warnings,
     };
   }
@@ -172,7 +172,7 @@ const cacheModel = (file: File, model: Object3D): void => {
   cleanCache();
 };
 
-// Optimized loading functions with caching and web workers
+// Optimized loading functions with caching
 const loadGLTF = (
   file: File,
   onProgress?: (progress: ImportProgress) => void
@@ -195,51 +195,66 @@ const loadGLTF = (
         onProgress?.({
           loaded: 10,
           total: 100,
-          stage: "Processing with worker",
+          stage: "Processing GLTF",
         });
 
-        // Use web worker for parsing
-        const result: ParseResult = await workerManager.parseModel(
-          "gltf",
-          arrayBuffer,
-          onProgress
+        // Import GLTFLoader and related loaders dynamically
+        // NOTE: We parse GLTF directly on main thread to avoid JSON serialization
+        // issues with ImageBitmap textures. Worker-based parsing causes toJSON()
+        // to lose ImageBitmap data, which breaks ObjectLoader.parse() deserialization.
+        const { GLTFLoader } = await import(
+          "three/examples/jsm/loaders/GLTFLoader.js"
+        );
+        const { DRACOLoader } = await import(
+          "three/examples/jsm/loaders/DRACOLoader.js"
         );
 
-        // Convert JSON back to Three.js object
-        const loader = new ObjectLoader();
-        const object3D = loader.parse(result.object);
+        const loader = new GLTFLoader();
 
-        // Restore bounding box if it exists
-        if (result.boundingBox) {
-          const box = new Box3();
-          box.fromJSON(result.boundingBox);
-          object3D.userData.boundingBox = box;
-        }
+        // Configure Draco loader for mesh compression
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath(
+          "https://www.gstatic.com/draco/versioned/decoders/1.5.6/"
+        );
+        loader.setDRACOLoader(dracoLoader);
 
-        // Store GLTF metadata
-        if (result.lights) {
-          object3D.userData.gltfLights = result.lights;
-        }
-        if (result.cameras) {
-          object3D.userData.gltfCameras = result.cameras;
-        }
-        if (result.validation) {
-          object3D.userData.gltfValidation = result.validation;
-        }
-        if (result.animations) {
-          object3D.userData.gltfAnimations = result.animations;
-        }
-        if (result.gltf) {
-          object3D.userData.gltf = result.gltf;
-        }
+        onProgress?.({ loaded: 25, total: 100, stage: "Parsing GLTF" });
 
-        // Optimize textures in the model
-        optimizeModelTextures(object3D);
+        loader.parse(
+          arrayBuffer,
+          "",
+          (gltf) => {
+            onProgress?.({
+              loaded: 75,
+              total: 100,
+              stage: "Optimizing model",
+            });
 
-        // Cache the model
-        cacheModel(file, object3D);
+            const object3D = gltf.scene;
 
-        resolve(object3D);
+            // Compute bounding box
+            const box = new Box3().setFromObject(object3D);
+            object3D.userData.boundingBox = box;
+
+            // Store GLTF metadata
+            if (gltf.animations && gltf.animations.length > 0) {
+              object3D.userData.gltfAnimations = gltf.animations;
+            }
+
+            // Optimize textures in the model
+            optimizeModelTextures(object3D);
+
+            // Cache the model
+            cacheModel(file, object3D);
+
+            onProgress?.({ loaded: 100, total: 100, stage: "Complete" });
+            resolve(object3D);
+          },
+          (parseError) => {
+            console.error("GLTF parse error:", parseError);
+            reject(new Error("Failed to parse GLTF file"));
+          }
+        );
       } catch (error) {
         console.error("GLTF parse error:", error);
         reject(new Error("Failed to parse GLTF file"));

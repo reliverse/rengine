@@ -282,6 +282,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       animations: THREE.AnimationClip[];
       gltf: any;
     };
+
     // Safely serialize GLTF data, excluding non-transferable objects
     const gltfData = resultData.gltf
       ? {

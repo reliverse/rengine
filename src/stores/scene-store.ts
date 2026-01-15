@@ -143,6 +143,15 @@ export interface SceneState {
     isModified: boolean;
     lastSavedAt?: Date;
   };
+
+  // Blueprint files
+  blueprintFiles: Array<{
+    id: string;
+    name: string;
+    filePath: string | null;
+    isModified: boolean;
+    lastSavedAt?: Date;
+  }>;
 }
 
 export interface SceneActions {
@@ -151,6 +160,7 @@ export interface SceneActions {
     typeOrObject: SceneObject["type"] | SceneObject,
     position?: [number, number, number]
   ) => void;
+  addObjects: (objects: SceneObject[]) => void;
   removeObject: (id: string) => void;
   updateObject: (id: string, updates: Partial<SceneObject>) => void;
   duplicateObject: (id: string) => void;
@@ -178,6 +188,8 @@ export interface SceneActions {
   // Camera
   setCameraPosition: (position: [number, number, number]) => void;
   setCameraTarget: (target: [number, number, number]) => void;
+  focusOnObject: (id: string) => void;
+  focusOnLight: (id: string) => void;
 
   // Grid
   setGridVisible: (visible: boolean) => void;
@@ -243,6 +255,21 @@ export interface SceneActions {
   markSceneModified: () => void;
   markSceneSaved: () => void;
   loadScene: (sceneState: Partial<SceneState>) => void;
+
+  // Blueprint file management
+  addBlueprintFile: (blueprint: {
+    id: string;
+    name: string;
+    filePath: string | null;
+    isModified: boolean;
+    lastSavedAt?: Date;
+  }) => void;
+  updateBlueprintFile: (
+    id: string,
+    updates: Partial<SceneState["blueprintFiles"][0]>
+  ) => void;
+  removeBlueprintFile: (id: string) => void;
+  clearBlueprintFiles: () => void;
 
   // Memory management
   cleanupSceneResources: () => void;
@@ -396,6 +423,7 @@ export const useSceneStore = create<SceneState & SceneActions>()(
 
     currentFilePath: null,
     sceneMetadata: SCENE_METADATA_DEFAULTS,
+    blueprintFiles: [],
 
     // Actions
     addObject: (typeOrObject, position) => {
@@ -428,6 +456,15 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       set((state) => ({
         objects: [...state.objects, newObject],
         selectedObjectIds: [newObject.id],
+      }));
+
+      get().markSceneModified();
+    },
+
+    addObjects: (objects) => {
+      // Batch add multiple objects at once (for performance during imports)
+      set((state) => ({
+        objects: [...state.objects, ...objects],
       }));
 
       get().markSceneModified();
@@ -677,6 +714,60 @@ export const useSceneStore = create<SceneState & SceneActions>()(
       get().markSceneModified();
     },
 
+    focusOnObject: (id) => {
+      const state = get();
+      const object = state.objects.find((obj) => obj.id === id);
+      if (!object) return;
+
+      const objectPosition = object.position;
+
+      // Calculate bounding box size to determine camera distance
+      let boundingSize = 5; // default
+      if (object.importedModel) {
+        const box = new THREE.Box3().setFromObject(object.importedModel);
+        const size = box.getSize(new THREE.Vector3());
+        boundingSize = Math.max(size.x, size.y, size.z) * 2;
+      } else {
+        // For primitives, use scale
+        boundingSize = Math.max(...object.scale) * 3;
+      }
+
+      // Position camera at an angle from the object
+      const distance = Math.max(boundingSize, 10);
+      const cameraPosition: [number, number, number] = [
+        objectPosition[0] + distance * 0.7,
+        objectPosition[1] + distance * 0.5,
+        objectPosition[2] + distance * 0.7,
+      ];
+
+      set({
+        cameraPosition,
+        cameraTarget: objectPosition,
+      });
+      get().markSceneModified();
+    },
+
+    focusOnLight: (id) => {
+      const state = get();
+      const light = state.lights.find((l) => l.id === id);
+      if (!light) return;
+
+      const lightPosition = light.position;
+      const distance = 15;
+
+      const cameraPosition: [number, number, number] = [
+        lightPosition[0] + distance * 0.7,
+        lightPosition[1] + distance * 0.5,
+        lightPosition[2] + distance * 0.7,
+      ];
+
+      set({
+        cameraPosition,
+        cameraTarget: lightPosition,
+      });
+      get().markSceneModified();
+    },
+
     setGridVisible: (visible) => {
       set({ gridVisible: visible });
       get().markSceneModified();
@@ -823,6 +914,7 @@ export const useSceneStore = create<SceneState & SceneActions>()(
         lights: [],
         selectedObjectIds: [],
         selectedLightIds: [],
+        blueprintFiles: [],
       });
 
       // Also clear material selection
@@ -983,7 +1075,37 @@ export const useSceneStore = create<SceneState & SceneActions>()(
           ...state.sceneMetadata,
           isModified: false,
         },
+        blueprintFiles: sceneState.blueprintFiles ?? state.blueprintFiles,
       }));
+    },
+
+    // Blueprint file management actions
+    addBlueprintFile: (blueprint) => {
+      set((state) => ({
+        blueprintFiles: [...state.blueprintFiles, blueprint],
+      }));
+      get().markSceneModified();
+    },
+
+    updateBlueprintFile: (id, updates) => {
+      set((state) => ({
+        blueprintFiles: state.blueprintFiles.map((bp) =>
+          bp.id === id ? { ...bp, ...updates } : bp
+        ),
+      }));
+      get().markSceneModified();
+    },
+
+    removeBlueprintFile: (id) => {
+      set((state) => ({
+        blueprintFiles: state.blueprintFiles.filter((bp) => bp.id !== id),
+      }));
+      get().markSceneModified();
+    },
+
+    clearBlueprintFiles: () => {
+      set({ blueprintFiles: [] });
+      get().markSceneModified();
     },
 
     // Memory management functions

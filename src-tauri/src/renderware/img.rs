@@ -1,8 +1,8 @@
+use crate::RengineError;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
-use crate::RengineError;
 
 // IMG archive sector size (standard for GTA games)
 // All offsets and sizes in IMG entries are stored in sectors, not bytes
@@ -20,7 +20,7 @@ pub struct ImgEntry {
     pub size: u32,
     pub name: String,
     pub renderware_version: Option<String>, // Will be populated by version detection
-    pub file_type: Option<String>, // DFF, TXD, COL, etc.
+    pub file_type: Option<String>,          // DFF, TXD, COL, etc.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,10 +65,11 @@ impl ImgArchive {
     pub fn parse_archive(file: &mut File, path: &str) -> Result<Self, RengineError> {
         // Read the entire file to determine version and parse entries
         let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).map_err(|e| RengineError::FileReadFailed {
-            path: path.to_string(),
-            details: e.to_string(),
-        })?;
+        file.read_to_end(&mut buffer)
+            .map_err(|e| RengineError::FileReadFailed {
+                path: path.to_string(),
+                details: e.to_string(),
+            })?;
 
         if buffer.len() < 8 {
             return Err(RengineError::FileReadFailed {
@@ -108,7 +109,8 @@ impl ImgArchive {
 
         // Try version 1 first (GTA III/VC format)
         if buffer.len() >= 8 {
-            let entry_count = u32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]) as usize;
+            let entry_count =
+                u32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]) as usize;
 
             // Version 1: entries start at offset 8, each entry is 32 bytes (name: 24, offset: 4, size: 4)
             let expected_size_v1 = 8 + (entry_count * 32);
@@ -126,13 +128,17 @@ impl ImgArchive {
                     let size_start = entry_offset + 28;
 
                     let offset = u32::from_le_bytes([
-                        buffer[offset_start], buffer[offset_start + 1],
-                        buffer[offset_start + 2], buffer[offset_start + 3]
+                        buffer[offset_start],
+                        buffer[offset_start + 1],
+                        buffer[offset_start + 2],
+                        buffer[offset_start + 3],
                     ]);
 
                     let size = u32::from_le_bytes([
-                        buffer[size_start], buffer[size_start + 1],
-                        buffer[size_start + 2], buffer[size_start + 3]
+                        buffer[size_start],
+                        buffer[size_start + 1],
+                        buffer[size_start + 2],
+                        buffer[size_start + 3],
                     ]);
 
                     // Check if offset + size is within file bounds
@@ -155,7 +161,8 @@ impl ImgArchive {
             let mut entry_count = 0;
 
             // Count entries until we find an invalid one or reach a reasonable limit
-            while entry_count < 10000 { // Reasonable upper bound
+            while entry_count < 10000 {
+                // Reasonable upper bound
                 let entry_offset = entry_count * 32;
                 if entry_offset + 32 > buffer.len() {
                     break;
@@ -173,13 +180,17 @@ impl ImgArchive {
                 let size_start = entry_offset + 28;
 
                 let offset = u32::from_le_bytes([
-                    buffer[offset_start], buffer[offset_start + 1],
-                    buffer[offset_start + 2], buffer[offset_start + 3]
+                    buffer[offset_start],
+                    buffer[offset_start + 1],
+                    buffer[offset_start + 2],
+                    buffer[offset_start + 3],
                 ]);
 
                 let size = u32::from_le_bytes([
-                    buffer[size_start], buffer[size_start + 1],
-                    buffer[size_start + 2], buffer[size_start + 3]
+                    buffer[size_start],
+                    buffer[size_start + 1],
+                    buffer[size_start + 2],
+                    buffer[size_start + 3],
                 ]);
 
                 // Check if offset + size is within file bounds
@@ -216,7 +227,8 @@ impl ImgArchive {
                     });
                 }
 
-                let entry_count = u32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]) as usize;
+                let entry_count =
+                    u32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]) as usize;
                 let entries_start = 8;
 
                 for i in 0..entry_count {
@@ -278,10 +290,20 @@ impl ImgArchive {
         let name = String::from_utf8_lossy(&name_bytes[0..name_end]).to_string();
 
         // Offset: bytes 24-27 (little endian)
-        let offset = u32::from_le_bytes([entry_data[24], entry_data[25], entry_data[26], entry_data[27]]);
+        let offset = u32::from_le_bytes([
+            entry_data[24],
+            entry_data[25],
+            entry_data[26],
+            entry_data[27],
+        ]);
 
         // Size: bytes 28-31 (little endian)
-        let size = u32::from_le_bytes([entry_data[28], entry_data[29], entry_data[30], entry_data[31]]);
+        let size = u32::from_le_bytes([
+            entry_data[28],
+            entry_data[29],
+            entry_data[30],
+            entry_data[31],
+        ]);
 
         // Determine file type from extension
         let file_type = Self::determine_file_type(&name);
@@ -319,7 +341,10 @@ impl ImgArchive {
 
     /// Extract an entry to a file
     pub fn extract_entry(&self, entry_name: &str, output_path: &str) -> Result<(), RengineError> {
-        let entry = self.entries.iter().find(|e| e.name == entry_name)
+        let entry = self
+            .entries
+            .iter()
+            .find(|e| e.name == entry_name)
             .ok_or_else(|| RengineError::FileReadFailed {
                 path: entry_name.to_string(),
                 details: "Entry not found in archive".to_string(),
@@ -332,18 +357,20 @@ impl ImgArchive {
 
         // Seek to entry offset (convert from sectors to bytes)
         let byte_offset = entry.offset as u64 * SECTOR_SIZE as u64;
-        file.seek(SeekFrom::Start(byte_offset)).map_err(|e| RengineError::FileReadFailed {
-            path: self.file_path.clone(),
-            details: format!("Seek error: {}", e),
-        })?;
+        file.seek(SeekFrom::Start(byte_offset))
+            .map_err(|e| RengineError::FileReadFailed {
+                path: self.file_path.clone(),
+                details: format!("Seek error: {}", e),
+            })?;
 
         // Read entry data (convert from sectors to bytes)
         let byte_size = entry.size as usize * SECTOR_SIZE as usize;
         let mut data = vec![0u8; byte_size];
-        file.read_exact(&mut data).map_err(|e| RengineError::FileReadFailed {
-            path: self.file_path.clone(),
-            details: format!("Read error: {}", e),
-        })?;
+        file.read_exact(&mut data)
+            .map_err(|e| RengineError::FileReadFailed {
+                path: self.file_path.clone(),
+                details: format!("Read error: {}", e),
+            })?;
 
         // Write to output file
         std::fs::write(output_path, &data).map_err(|e| RengineError::FileWriteFailed {
@@ -356,7 +383,10 @@ impl ImgArchive {
 
     /// Get entry data without writing to file
     pub fn get_entry_data(&self, entry_name: &str) -> Result<Vec<u8>, RengineError> {
-        let entry = self.entries.iter().find(|e| e.name == entry_name)
+        let entry = self
+            .entries
+            .iter()
+            .find(|e| e.name == entry_name)
             .ok_or_else(|| RengineError::FileReadFailed {
                 path: entry_name.to_string(),
                 details: "Entry not found in archive".to_string(),
@@ -369,29 +399,35 @@ impl ImgArchive {
 
         // Seek to entry offset (convert from sectors to bytes)
         let byte_offset = entry.offset as u64 * SECTOR_SIZE as u64;
-        file.seek(SeekFrom::Start(byte_offset)).map_err(|e| RengineError::FileReadFailed {
-            path: self.file_path.clone(),
-            details: format!("Seek error: {}", e),
-        })?;
+        file.seek(SeekFrom::Start(byte_offset))
+            .map_err(|e| RengineError::FileReadFailed {
+                path: self.file_path.clone(),
+                details: format!("Seek error: {}", e),
+            })?;
 
         // Read entry data (convert from sectors to bytes)
         let byte_size = entry.size as usize * SECTOR_SIZE as usize;
         let mut data = vec![0u8; byte_size];
-        file.read_exact(&mut data).map_err(|e| RengineError::FileReadFailed {
-            path: self.file_path.clone(),
-            details: format!("Read error: {}", e),
-        })?;
+        file.read_exact(&mut data)
+            .map_err(|e| RengineError::FileReadFailed {
+                path: self.file_path.clone(),
+                details: format!("Read error: {}", e),
+            })?;
 
         Ok(data)
     }
 
     /// Analyze RenderWare versions for all entries
-    pub fn analyze_renderware_versions(&mut self, version_manager: &super::versions::RenderWareVersionManager) {
+    pub fn analyze_renderware_versions(
+        &mut self,
+        version_manager: &super::versions::RenderWareVersionManager,
+    ) {
         for i in 0..self.entries.len() {
             let entry_name = self.entries[i].name.clone();
             if let Some(data) = self.get_entry_data(&entry_name).ok() {
                 if let Ok((file_type, version_str, _version_num)) =
-                    version_manager.detect_file_format_version(&data, &entry_name) {
+                    version_manager.detect_file_format_version(&data, &entry_name)
+                {
                     self.entries[i].renderware_version = Some(version_str);
                     // Update file_type if it was detected as RenderWare
                     if file_type != "Unknown" && self.entries[i].file_type.is_none() {
@@ -404,7 +440,6 @@ impl ImgArchive {
 
     /// Add a new entry to the archive (in-memory operation)
     pub fn add_entry(&mut self, filename: &str, data: &[u8]) -> Result<(), crate::RengineError> {
-
         // Validate inputs
         if filename.is_empty() || data.is_empty() {
             return Err(crate::RengineError::FileReadFailed {
@@ -421,7 +456,11 @@ impl ImgArchive {
         };
 
         // Check for duplicate entries (replace if exists)
-        if let Some(existing_index) = self.entries.iter().position(|e| e.name.to_lowercase() == entry_name.to_lowercase()) {
+        if let Some(existing_index) = self
+            .entries
+            .iter()
+            .position(|e| e.name.to_lowercase() == entry_name.to_lowercase())
+        {
             // Replace existing entry
             self.entries[existing_index] = ImgEntry {
                 offset: 0, // Will be recalculated on save
@@ -452,7 +491,11 @@ impl ImgArchive {
     /// Delete an entry from the archive (in-memory operation)
     pub fn delete_entry(&mut self, entry_name: &str) -> Result<(), crate::RengineError> {
         // Find the entry to delete
-        if let Some(index) = self.entries.iter().position(|e| e.name.to_lowercase() == entry_name.to_lowercase()) {
+        if let Some(index) = self
+            .entries
+            .iter()
+            .position(|e| e.name.to_lowercase() == entry_name.to_lowercase())
+        {
             // Move entry to deleted_entries for tracking
             let deleted_entry = self.entries.remove(index);
             self.deleted_entries.push(deleted_entry);
@@ -470,7 +513,11 @@ impl ImgArchive {
     /// Restore a deleted entry
     pub fn restore_entry(&mut self, entry_name: &str) -> Result<(), crate::RengineError> {
         // Find the entry in deleted_entries
-        if let Some(index) = self.deleted_entries.iter().position(|e| e.name.to_lowercase() == entry_name.to_lowercase()) {
+        if let Some(index) = self
+            .deleted_entries
+            .iter()
+            .position(|e| e.name.to_lowercase() == entry_name.to_lowercase())
+        {
             // Move entry back to entries
             let restored_entry = self.deleted_entries.remove(index);
             self.entries.push(restored_entry);

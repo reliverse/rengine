@@ -55,8 +55,8 @@ impl RenderWareVersionManager {
         let content = fs::read_to_string(json_path)
             .map_err(|e| format!("Failed to read versionsets file: {}", e))?;
 
-        let data: serde_json::Value = serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+        let data: serde_json::Value =
+            serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
         // Parse version sets
         if let Some(sets) = data.get("version_sets").and_then(|v| v.as_array()) {
@@ -85,15 +85,18 @@ impl RenderWareVersionManager {
 
     fn parse_game_set(value: &serde_json::Value) -> Option<GameSet> {
         let name = value.get("name")?.as_str()?.to_string();
-        let display_name = value.get("display_name")
+        let display_name = value
+            .get("display_name")
             .and_then(|v| v.as_str())
             .unwrap_or(&name)
             .to_string();
-        let icon_name = value.get("icon_name")
+        let icon_name = value
+            .get("icon_name")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let platforms = value.get("platforms")?
+        let platforms = value
+            .get("platforms")?
             .as_array()?
             .iter()
             .filter_map(|p| Self::parse_platform_info(p))
@@ -109,17 +112,21 @@ impl RenderWareVersionManager {
 
     fn parse_platform_info(value: &serde_json::Value) -> Option<PlatformInfo> {
         let platform = value.get("platform")?.as_str()?.to_string();
-        let rw_version = value.get("rw_version")
+        let rw_version = value
+            .get("rw_version")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let rw_version_min = value.get("rw_version_min")
+        let rw_version_min = value
+            .get("rw_version_min")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let rw_version_max = value.get("rw_version_max")
+        let rw_version_max = value
+            .get("rw_version_max")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let data_types = value.get("data_types")
+        let data_types = value
+            .get("data_types")
             .and_then(|v| v.as_array())
             .unwrap_or(&vec![])
             .iter()
@@ -147,9 +154,15 @@ impl RenderWareVersionManager {
     pub fn version_string_to_hex(&self, version_str: &str) -> i32 {
         let parts: Vec<&str> = version_str.split('.').collect();
         if parts.len() >= 3 {
-            if let (Ok(major), Ok(minor), Ok(patch1)) =
-                (parts[0].parse::<i32>(), parts[1].parse::<i32>(), parts[2].parse::<i32>()) {
-                let patch2 = parts.get(3).and_then(|p| p.parse::<i32>().ok()).unwrap_or(0);
+            if let (Ok(major), Ok(minor), Ok(patch1)) = (
+                parts[0].parse::<i32>(),
+                parts[1].parse::<i32>(),
+                parts[2].parse::<i32>(),
+            ) {
+                let patch2 = parts
+                    .get(3)
+                    .and_then(|p| p.parse::<i32>().ok())
+                    .unwrap_or(0);
                 return (major << 16) | (minor << 12) | (patch1 << 8) | patch2;
             }
         }
@@ -188,14 +201,18 @@ impl RenderWareVersionManager {
 
     pub fn is_valid_rw_version(&self, version_value: i32) -> bool {
         // Check typical RW version ranges
-        (0x30000..=0x3FFFF).contains(&version_value) ||
-        [0x0800FFFF, 0x1003FFFF, 0x1005FFFF, 0x1401FFFF, 0x1400FFFF, 0x1803FFFF, 0x1C020037]
+        (0x30000..=0x3FFFF).contains(&version_value)
+            || [
+                0x0800FFFF, 0x1003FFFF, 0x1005FFFF, 0x1401FFFF, 0x1400FFFF, 0x1803FFFF, 0x1C020037,
+            ]
             .contains(&version_value)
     }
 
     #[allow(dead_code)]
     pub fn find_game_by_version(&self, version_value: i32) -> Option<GameInfo> {
-        self.find_all_games_by_version(version_value).into_iter().next()
+        self.find_all_games_by_version(version_value)
+            .into_iter()
+            .next()
     }
 
     pub fn find_all_games_by_version(&self, version_value: i32) -> Vec<GameInfo> {
@@ -206,7 +223,9 @@ impl RenderWareVersionManager {
             for platform in &game_set.platforms {
                 let is_match = if let Some(rw_version) = &platform.rw_version {
                     *rw_version == version_str
-                } else if let (Some(min_ver), Some(max_ver)) = (&platform.rw_version_min, &platform.rw_version_max) {
+                } else if let (Some(min_ver), Some(max_ver)) =
+                    (&platform.rw_version_min, &platform.rw_version_max)
+                {
                     let min_hex = self.version_string_to_hex(min_ver);
                     let max_hex = self.version_string_to_hex(max_ver);
                     (min_hex..=max_hex).contains(&version_value)
@@ -229,7 +248,11 @@ impl RenderWareVersionManager {
         matches
     }
 
-    pub fn get_version_display_string(&self, version_value: i32, include_platforms: bool) -> String {
+    pub fn get_version_display_string(
+        &self,
+        version_value: i32,
+        include_platforms: bool,
+    ) -> String {
         if !include_platforms {
             return self.hex_to_version_string(version_value);
         }
@@ -281,10 +304,17 @@ impl RenderWareVersionManager {
 
     #[allow(dead_code)]
     pub fn get_platform_data_types(&self, platform: &str) -> Vec<String> {
-        self.platform_info.get(platform).cloned().unwrap_or_default()
+        self.platform_info
+            .get(platform)
+            .cloned()
+            .unwrap_or_default()
     }
 
-    pub fn detect_file_format_version(&self, file_data: &[u8], filename: &str) -> Result<(String, String, i32), String> {
+    pub fn detect_file_format_version(
+        &self,
+        file_data: &[u8],
+        filename: &str,
+    ) -> Result<(String, String, i32), String> {
         if file_data.len() < 12 {
             return Ok(("Unknown".to_string(), "Unknown".to_string(), 0));
         }
@@ -297,7 +327,9 @@ impl RenderWareVersionManager {
                 match fourcc {
                     "COLL" => return Ok(("COL".to_string(), "COL1 (GTA III/VC)".to_string(), 0)),
                     "COL2" => return Ok(("COL".to_string(), "COL2 (GTA SA)".to_string(), 0)),
-                    "COL3" => return Ok(("COL".to_string(), "COL3 (GTA SA Advanced)".to_string(), 0)),
+                    "COL3" => {
+                        return Ok(("COL".to_string(), "COL3 (GTA SA Advanced)".to_string(), 0))
+                    }
                     "COL4" => return Ok(("COL".to_string(), "COL4 (Extended)".to_string(), 0)),
                     _ => {}
                 }
@@ -307,17 +339,21 @@ impl RenderWareVersionManager {
         // Check for RenderWare files
         if file_data.len() >= 12 {
             // Read section type and version
-            let section_type = u32::from_le_bytes([file_data[0], file_data[1], file_data[2], file_data[3]]);
-            let version = u32::from_le_bytes([file_data[8], file_data[9], file_data[10], file_data[11]]);
+            let section_type =
+                u32::from_le_bytes([file_data[0], file_data[1], file_data[2], file_data[3]]);
+            let version =
+                u32::from_le_bytes([file_data[8], file_data[9], file_data[10], file_data[11]]);
 
             let rw_version = self.get_rw_version(Some(version as i32));
 
             match section_type {
-                0x0010 => { // CLUMP (DFF)
+                0x0010 => {
+                    // CLUMP (DFF)
                     let version_str = self.get_version_display_string(rw_version, true);
                     Ok(("DFF".to_string(), version_str, rw_version))
                 }
-                0x0016 => { // TEXDICTIONARY (TXD)
+                0x0016 => {
+                    // TEXDICTIONARY (TXD)
                     let version_str = self.get_version_display_string(rw_version, true);
                     Ok(("TXD".to_string(), version_str, rw_version))
                 }
@@ -326,10 +362,14 @@ impl RenderWareVersionManager {
                     let version_str = self.get_version_display_string(rw_version, true);
                     Ok((ext, version_str, rw_version))
                 }
-                _ => Ok(("Unknown".to_string(), "Unknown format".to_string(), 0))
+                _ => Ok(("Unknown".to_string(), "Unknown format".to_string(), 0)),
             }
         } else {
-            let ext = filename.split('.').last().unwrap_or("Unknown").to_uppercase();
+            let ext = filename
+                .split('.')
+                .last()
+                .unwrap_or("Unknown")
+                .to_uppercase();
             Ok((ext, "Unknown format".to_string(), 0))
         }
     }

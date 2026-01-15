@@ -55,7 +55,17 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
         const [x, y, z] = obj.position;
         const [rx, ry, rz] = obj.rotation; // Rotation is already in degrees
 
-        return `CreateDynamicObject(${obj.modelid}, Float:${x.toFixed(precision)}, Float:${y.toFixed(precision)}, Float:${z.toFixed(precision)}, Float:${rx.toFixed(precision)}, Float:${ry.toFixed(precision)}, Float:${rz.toFixed(precision)}, worldid = -1, interiorid = -1, playerid = -1, Float:streamdistance = STREAMER_OBJECT_SD, Float:drawdistance = STREAMER_OBJECT_DD, areaid = -1, priority = 0);`;
+        // Use stored PWN data if available, otherwise use defaults
+        const pwnData = (obj as any).pwnData;
+        const worldid = pwnData?.worldid ?? -1;
+        const interiorid = pwnData?.interiorid ?? -1;
+        const playerid = pwnData?.playerid ?? -1;
+        const streamdistance = pwnData?.streamdistance ?? 200.0;
+        const drawdistance = pwnData?.drawdistance ?? 0.0;
+        const areaid = pwnData?.areaid ?? -1;
+        const priority = pwnData?.priority ?? 0;
+
+        return `CreateDynamicObject(${obj.modelid}, ${x.toFixed(precision)}, ${y.toFixed(precision)}, ${z.toFixed(precision)}, ${rx.toFixed(precision)}, ${ry.toFixed(precision)}, ${rz.toFixed(precision)}, ${worldid}, ${interiorid}, ${playerid}, ${streamdistance}, ${drawdistance}, ${areaid}, ${priority});`;
       })
       .join("\n");
   };
@@ -234,7 +244,7 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
           <DialogTitle>Export Scene</DialogTitle>
           <DialogDescription>
             Export scene objects in the selected format. Only objects with model
-            IDs will be exported.
+            IDs will be exported. PWN export uses positional parameters format.
           </DialogDescription>
         </DialogHeader>
 

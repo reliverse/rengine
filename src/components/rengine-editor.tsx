@@ -1,9 +1,10 @@
 import { documentDir, homeDir, join, tempDir } from "@tauri-apps/api/path";
 import { mkdir } from "@tauri-apps/plugin-fs";
 import { Package, Settings as SettingsIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "~/lib/utils";
 import { useSceneStore } from "~/stores/scene-store";
+import { useBlueprintStore } from "~/stores/blueprint-store";
 import { saveScene } from "~/utils/scene-persistence";
 import { LeftSidebar } from "./left-sidebar";
 import { ModelViewerCanvas } from "./model-viewer-canvas";
@@ -12,8 +13,9 @@ import { RightSidebar, type SidebarContext } from "./right-sidebar";
 import { SceneCanvas } from "./scene-canvas";
 import { Toolbar } from "./toolbar";
 import { Button } from "./ui/button";
+import { BlueprintEditor as BlueprintEditorComponent } from "./blueprint/blueprint-editor";
 
-export type ViewportMode = "editor" | "model-viewer";
+export type ViewportMode = "editor" | "model-viewer" | "blueprint";
 
 export function RengineEditor() {
   const [rightSidebarContext, setRightSidebarContext] =
@@ -21,29 +23,26 @@ export function RengineEditor() {
   const [viewportMode, setViewportMode] = useState<ViewportMode>("editor");
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(false);
+  const { currentGraph } = useBlueprintStore();
+  const previousGraphRef = useRef<typeof currentGraph>(null);
+
+  // Automatically switch to blueprint mode when a blueprint is first loaded
+  useEffect(() => {
+    // Only switch if a blueprint was just loaded (went from null to a graph)
+    if (
+      currentGraph &&
+      !previousGraphRef.current &&
+      viewportMode !== "blueprint"
+    ) {
+      setViewportMode("blueprint");
+    }
+    previousGraphRef.current = currentGraph;
+  }, [currentGraph, viewportMode]);
+
   useEffect(() => {
     const initializeNewProject = async () => {
       try {
         const sceneState = useSceneStore.getState();
-
-        // Add ground plane to empty project
-        if (sceneState.objects.length === 0) {
-          console.log("Adding ground plane to new project...");
-          sceneState.addObject("plane", [0, 0, 0]);
-
-          // Update the ground plane properties for better appearance
-          const groundPlane = sceneState.objects.find(
-            (obj) => obj.name === "Plane"
-          );
-          if (groundPlane) {
-            sceneState.updateObject(groundPlane.id, {
-              name: "Ground Plane",
-              scale: [20, 1, 20], // Make it a larger ground platform
-              color: "#2a2a2a", // Darker gray color for ground
-              position: [0, -0.01, 0], // Slightly below origin to avoid z-fighting
-            });
-          }
-        }
 
         if (!sceneState.currentFilePath) {
           let autoSaveDir: string;
@@ -159,6 +158,18 @@ export function RengineEditor() {
           >
             Model Viewer
           </Button>
+          <Button
+            className={cn(
+              "h-8 flex-1 rounded-none px-3 font-medium text-xs",
+              viewportMode === "blueprint" &&
+                "border-primary border-b-2 bg-secondary text-secondary-foreground"
+            )}
+            onClick={() => setViewportMode("blueprint")}
+            size="sm"
+            variant={viewportMode === "blueprint" ? "secondary" : "ghost"}
+          >
+            Blueprint
+          </Button>
         </div>
 
         {/* Main Content */}
@@ -197,8 +208,10 @@ export function RengineEditor() {
 
             {viewportMode === "editor" ? (
               <SceneCanvas />
-            ) : (
+            ) : viewportMode === "model-viewer" ? (
               <ModelViewerCanvas />
+            ) : (
+              <BlueprintEditorComponent />
             )}
           </div>
 

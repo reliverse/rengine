@@ -266,7 +266,7 @@ export function SceneCanvas() {
             position: cameraPosition,
             fov: 50,
             near: 0.1,
-            far: 1000,
+            far: 24_000,
           }}
           dpr={dpr}
           frameloop="demand"
@@ -299,7 +299,7 @@ export function SceneCanvas() {
               enablePan={true}
               enableRotate={true}
               enableZoom={true}
-              maxDistance={100}
+              maxDistance={24_000}
               minDistance={1}
               onChange={handleControlsChange}
               target={cameraTarget}

@@ -1,8 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { documentDir, homeDir, join, tempDir } from "@tauri-apps/api/path";
-import { open } from "@tauri-apps/plugin-dialog";
-import { mkdir, readFile } from "@tauri-apps/plugin-fs";
-import { invoke } from "@tauri-apps/api/core";
+import { mkdir } from "@tauri-apps/plugin-fs";
 import {
   Box,
   Circle,
@@ -21,9 +19,8 @@ import {
   Upload,
 } from "lucide-react";
 import { useState } from "react";
-import * as THREE from "three";
 import { ExportDialog } from "~/components/export-dialog";
-import { PwnImportDialog } from "~/components/pwn-import-dialog";
+import { ImportDialog } from "~/components/import-dialog";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -31,128 +28,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Progress } from "~/components/ui/progress";
 import { Separator } from "~/components/ui/separator";
 import { useToast } from "~/hooks/use-toast";
 import { cn } from "~/lib/utils";
 import { type TransformTool, useSceneStore } from "~/stores/scene-store";
 import { getPresetList } from "~/utils/lighting-presets";
-import { type ImportProgress, modelImporter } from "~/utils/model-import";
-import { loadScene, saveScene } from "~/utils/scene-persistence";
-
-// Helper function to create Three.js mesh from DFF geometry data
-function createMeshFromDffData(dffResult: any): THREE.Group {
-  const group = new THREE.Group();
-
-  if (!dffResult.geometries || dffResult.geometries.length === 0) {
-    // Return empty group if no geometries
-    return group;
-  }
-
-  dffResult.geometries.forEach((geometry: any, geomIndex: number) => {
-    try {
-      const threeGeometry = new THREE.BufferGeometry();
-
-      // Convert vertices
-      if (geometry.vertices && geometry.vertices.length > 0) {
-        const positions = geometry.vertices.flatMap((v: any) => [
-          v.x,
-          v.y,
-          v.z,
-        ]);
-        threeGeometry.setAttribute(
-          "position",
-          new THREE.Float32BufferAttribute(positions, 3)
-        );
-      }
-
-      // Convert normals if available
-      if (geometry.normals && geometry.normals.length > 0) {
-        const normals = geometry.normals.flatMap((v: any) => [v.x, v.y, v.z]);
-        threeGeometry.setAttribute(
-          "normal",
-          new THREE.Float32BufferAttribute(normals, 3)
-        );
-      }
-
-      // Convert UV coordinates if available
-      if (
-        geometry.uv_layers &&
-        geometry.uv_layers.length > 0 &&
-        geometry.uv_layers[0].length > 0
-      ) {
-        const uvs = geometry.uv_layers[0].flatMap((uv: any) => [
-          uv.u,
-          1.0 - uv.v,
-        ]); // Flip V for Three.js
-        threeGeometry.setAttribute(
-          "uv",
-          new THREE.Float32BufferAttribute(uvs, 2)
-        );
-      }
-
-      // Convert triangles to indices
-      if (geometry.triangles && geometry.triangles.length > 0) {
-        const indices = geometry.triangles.flatMap((t: any) => [t.a, t.b, t.c]);
-        threeGeometry.setIndex(indices);
-      }
-
-      // Compute normals if not provided
-      if (!geometry.normals || geometry.normals.length === 0) {
-        threeGeometry.computeVertexNormals();
-      }
-
-      threeGeometry.computeBoundingSphere();
-      threeGeometry.computeBoundingBox();
-
-      // Create material
-      let material: THREE.Material;
-      if (geometry.materials && geometry.materials.length > 0) {
-        const dffMaterial = geometry.materials[0];
-        const color = new THREE.Color(
-          dffMaterial.color.r / 255,
-          dffMaterial.color.g / 255,
-          dffMaterial.color.b / 255
-        );
-
-        material = new THREE.MeshStandardMaterial({
-          color,
-          transparent: dffMaterial.color.a < 255,
-          opacity: dffMaterial.color.a / 255,
-          roughness: 0.7,
-          metalness: 0.1,
-          side: THREE.DoubleSide,
-        });
-      } else {
-        material = new THREE.MeshStandardMaterial({
-          color: 0xcc_cc_cc,
-          roughness: 0.7,
-          metalness: 0.1,
-          side: THREE.DoubleSide,
-        });
-      }
-
-      const mesh = new THREE.Mesh(threeGeometry, material);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.name = `geometry_${geomIndex}`;
-
-      group.add(mesh);
-    } catch (err) {
-      console.warn(`Failed to create geometry ${geomIndex}:`, err);
-    }
-  });
-
-  // Center the model
-  const box = new THREE.Box3().setFromObject(group);
-  const center = box.getCenter(new THREE.Vector3());
-  group.position.sub(center);
-
-  return group;
-}
-
-// Regex for removing file extensions
-const FILE_EXTENSION_REGEX = /\.(dff|gltf|glb|obj|fbx)$/i;
+import {
+  loadScene,
+  saveScene,
+  deserializeScene,
+} from "~/utils/scene-persistence";
 
 const toolIcons = {
   select: MousePointer,
@@ -161,29 +46,9 @@ const toolIcons = {
   scale: Scaling,
 };
 
-function getMimeType(fileName: string): string {
-  const extension = fileName.split(".").pop()?.toLowerCase();
-  switch (extension) {
-    case "gltf":
-    case "glb":
-      return "model/gltf-binary";
-    case "obj":
-      return "text/plain";
-    case "fbx":
-    case "dff":
-      return "application/octet-stream";
-    default:
-      return "application/octet-stream";
-  }
-}
-
 export function Toolbar() {
-  const [importProgress, setImportProgress] = useState<ImportProgress | null>(
-    null
-  );
-  const [isImporting, setIsImporting] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [pwnImportDialogOpen, setPwnImportDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -270,201 +135,6 @@ export function Toolbar() {
 
   const handleAddObject = (type: "cube" | "sphere" | "plane") => {
     startPlacement(type);
-  };
-
-  const handleImport = async () => {
-    if (isImporting) {
-      return;
-    }
-
-    try {
-      setIsImporting(true);
-
-      const selected = await open({
-        multiple: false,
-        filters: [
-          {
-            name: "3D Models",
-            extensions: ["gltf", "glb", "obj", "fbx", "dff"],
-          },
-        ],
-      });
-
-      if (selected && typeof selected === "string") {
-        const fileName = selected.split("/").pop() || "model";
-        const extension = fileName.split(".").pop()?.toLowerCase();
-
-        if (extension === "dff") {
-          // Handle DFF files using RenderWare import
-          try {
-            setImportProgress({
-              loaded: 0,
-              total: 100,
-              stage: "Importing DFF file...",
-            });
-
-            const result = (await invoke("import_dff_file", {
-              filePath: selected,
-            })) as any;
-
-            setImportProgress({
-              loaded: 100,
-              total: 100,
-              stage: "Creating scene object...",
-            });
-
-            // Create Three.js mesh from DFF geometry data
-            const importedModel = createMeshFromDffData(result);
-
-            // Calculate initial scale to fit the model reasonably in the scene
-            const box = new THREE.Box3().setFromObject(importedModel);
-            const size = box.getSize(new THREE.Vector3());
-            const maxDimension = Math.max(size.x, size.y, size.z);
-            const initialScale =
-              maxDimension > 0 ? Math.min(10 / maxDimension, 1) : 1;
-
-            // Apply initial scale
-            importedModel.scale.setScalar(initialScale);
-
-            // Create scene object for the imported DFF
-            const sceneObject = {
-              id: `dff_import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              name: fileName.replace(FILE_EXTENSION_REGEX, ""),
-              type: "imported" as const,
-              position: [0, 0, 0] as [number, number, number],
-              rotation: [0, 0, 0] as [number, number, number],
-              scale: [1, 1, 1] as [number, number, number],
-              color: "#ffffff",
-              visible: true,
-              modelid: undefined, // DFF files don't have SA:MP IDs like in IMG archives
-              importedModel, // The actual Three.js mesh
-              initialScale, // Store for proper transform handling
-              dffData: {
-                rw_version: result.rw_version,
-                frame_count: result.frames?.length || 0,
-                geometry_count: result.geometries?.length || 0,
-                atomic_count: result.atomics?.length || 0,
-                material_count:
-                  result.geometries?.reduce(
-                    (sum: number, g: any) => sum + (g.materials?.length || 0),
-                    0
-                  ) || 0,
-              },
-            };
-
-            useSceneStore.getState().addObject(sceneObject);
-
-            setImportProgress(null);
-
-            setTimeout(() => {
-              toast({
-                title: "DFF model imported successfully",
-                description: `${sceneObject.name} has been added to the scene.`,
-                duration: 3000,
-              });
-            }, 100);
-          } catch (error) {
-            setImportProgress(null);
-            console.error("DFF import error:", error);
-            setTimeout(() => {
-              toast({
-                title: "DFF import failed",
-                description:
-                  error instanceof Error
-                    ? error.message
-                    : "Unknown error occurred",
-                variant: "destructive",
-                duration: 5000,
-              });
-            }, 100);
-          }
-        } else {
-          // Handle standard 3D formats (gltf, glb, obj, fbx)
-          try {
-            const fileData = await readFile(selected);
-            const mimeType = getMimeType(fileName);
-
-            const blob = new Blob([fileData], { type: mimeType });
-            const file = Object.assign(blob, {
-              name: fileName,
-              lastModified: Date.now(),
-            }) as File;
-
-            setImportProgress({
-              loaded: 0,
-              total: 100,
-              stage: "Starting import...",
-            });
-
-            const result = await modelImporter.importFromFile(file);
-
-            setImportProgress(null);
-
-            if (result.success && result.object) {
-              useSceneStore.getState().addObject(result.object);
-
-              // Delay toast to prevent potential state conflicts
-              setTimeout(() => {
-                toast({
-                  title: "Model imported successfully",
-                  description: `${result.object?.name ?? "Model"} has been added to the scene.`,
-                  duration: 3000,
-                });
-              }, 100);
-
-              if (result.warnings && result.warnings.length > 0) {
-                setTimeout(() => {
-                  toast({
-                    title: "Import warnings",
-                    description: result.warnings?.join("\n"),
-                    variant: "default",
-                    duration: 5000,
-                  });
-                }, 1000);
-              }
-            } else {
-              // Delay error toast
-              setTimeout(() => {
-                toast({
-                  title: "Import failed",
-                  description: result.error || "Unknown error occurred",
-                  variant: "destructive",
-                  duration: 5000,
-                });
-              }, 100);
-            }
-          } catch (error) {
-            setImportProgress(null);
-            console.error("Import error:", error);
-            setTimeout(() => {
-              toast({
-                title: "Import failed",
-                description:
-                  error instanceof Error
-                    ? error.message
-                    : "Unknown error occurred",
-                variant: "destructive",
-                duration: 5000,
-              });
-            }, 100);
-          }
-        }
-      }
-    } catch (error) {
-      setImportProgress(null);
-      console.error("Import error:", error);
-      setTimeout(() => {
-        toast({
-          title: "Import failed",
-          description: "Failed to open file dialog",
-          variant: "destructive",
-          duration: 5000,
-        });
-      }, 100);
-    } finally {
-      setIsImporting(false);
-      setImportProgress(null);
-    }
   };
 
   const handleNewFile = async () => {
@@ -555,7 +225,8 @@ export function Toolbar() {
 
     if (result.success && result.data) {
       const sceneState = useSceneStore.getState();
-      sceneState.loadScene(result.data.scene);
+      const deserialized = deserializeScene(result.data);
+      sceneState.loadScene(deserialized);
       sceneState.setSceneMetadata({
         name: result.data.metadata.name,
       });
@@ -768,37 +439,13 @@ export function Toolbar() {
       <div className="flex items-center gap-1">
         <Button
           className="h-8 px-3"
-          disabled={isImporting}
-          onClick={handleImport}
+          onClick={() => setImportDialogOpen(true)}
           size="sm"
-          title="Import 3D Model"
+          title="Import (Model, PWN, IPL)"
           variant="ghost"
         >
           <Download className="mr-2 h-4 w-4" />
-          {isImporting ? "Importing..." : "Import Model"}
-        </Button>
-
-        {importProgress && (
-          <div className="flex min-w-48 items-center gap-2">
-            <Progress
-              className="h-2 flex-1"
-              value={(importProgress.loaded / importProgress.total) * 100}
-            />
-            <span className="min-w-0 truncate text-muted-foreground text-xs">
-              {importProgress.stage}
-            </span>
-          </div>
-        )}
-
-        <Button
-          className="h-8 px-3"
-          onClick={() => setPwnImportDialogOpen(true)}
-          size="sm"
-          title="Import PWN File"
-          variant="ghost"
-        >
-          <File className="mr-2 h-4 w-4" />
-          Import PWN
+          Import
         </Button>
 
         <Button
@@ -839,9 +486,9 @@ export function Toolbar() {
         open={exportDialogOpen}
       />
 
-      <PwnImportDialog
-        isOpen={pwnImportDialogOpen}
-        onOpenChange={setPwnImportDialogOpen}
+      <ImportDialog
+        isOpen={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
       />
     </div>
   );

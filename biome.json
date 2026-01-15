@@ -40,10 +40,13 @@
         "useDefaultSwitchClause": "off"
       },
       "complexity": {
-        "noExcessiveCognitiveComplexity": "off"
+        "noExcessiveCognitiveComplexity": "off",
+        "noUselessContinue": "off"
       },
       "suspicious": {
-        "noExplicitAny": "off"
+        "noExplicitAny": "off",
+        "useAwait": "off",
+        "noEmptyBlockStatements": "off"
       },
       "a11y": {
         "noStaticElementInteractions": "off",
