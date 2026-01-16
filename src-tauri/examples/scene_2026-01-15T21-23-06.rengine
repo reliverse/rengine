@@ -1,0 +1,153 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Untitled Scene",
+    "createdAt": "2026-01-15T21:23:11.946Z",
+    "modifiedAt": "2026-01-15T21:23:11.946Z",
+    "rengineVersion": "1.0.0"
+  },
+  "scene": {
+    "objects": [
+      {
+        "type": "sphere",
+        "position": [
+          -0.2613773224920335,
+          0,
+          -0.15084351198981327
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "color": "#ffffff",
+        "visible": true,
+        "id": "object_1q8y5jchg",
+        "name": "Sphere",
+        "materialId": "material_1768511986789_yr7k44axr"
+      },
+      {
+        "type": "cube",
+        "position": [
+          2.0767619740903,
+          0.42566550312953966,
+          -1.0818338458192436
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.169012048865087,
+          1,
+          2.7815052217257517
+        ],
+        "color": "#ffffff",
+        "visible": true,
+        "id": "object_qg00be6z5",
+        "name": "Cube",
+        "materialId": "material_1768512173074_r94dhuzvg"
+      }
+    ],
+    "lights": [
+      {
+        "type": "hemisphere",
+        "color": "#4A90E2",
+        "intensity": 0.3,
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "visible": true,
+        "castShadow": false,
+        "groundColor": "#2C3E50",
+        "id": "light_preset_moonlight_0_1768512153187",
+        "name": "Moonlight Light 1"
+      },
+      {
+        "type": "directional",
+        "color": "#E8F4FD",
+        "intensity": 0.8,
+        "position": [
+          10,
+          15,
+          8
+        ],
+        "visible": true,
+        "castShadow": true,
+        "shadowBias": -0.0001,
+        "shadowMapSize": 2048,
+        "shadowNear": 0.1,
+        "shadowFar": 100,
+        "shadowRadius": 8,
+        "id": "light_preset_moonlight_1_1768512153187",
+        "name": "Moonlight Light 2",
+        "target": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "type": "directional",
+        "color": "#ffffff",
+        "intensity": 1,
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "visible": true,
+        "castShadow": true,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "shadowBias": -0.0001,
+        "shadowMapSize": 2048,
+        "shadowNear": 0.1,
+        "shadowFar": 100,
+        "shadowRadius": 8,
+        "id": "light_n6n56wdlv",
+        "name": "Directional Light"
+      },
+      {
+        "type": "ambient",
+        "color": "#ffffff",
+        "intensity": 0.6,
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "visible": true,
+        "castShadow": true,
+        "id": "light_zak73l3j2",
+        "name": "Ambient Light"
+      }
+    ],
+    "cameraPosition": [
+      5,
+      5,
+      5
+    ],
+    "cameraTarget": [
+      0,
+      0,
+      0
+    ],
+    "gridVisible": true,
+    "snapToGrid": false,
+    "gridSize": 1,
+    "lightsVisible": true,
+    "blueprintFiles": []
+  }
+}

@@ -34,7 +34,7 @@ function NavigationMenuList({
         className
       )}
       data-slot="navigation-menu-list"
-      {...props}
+      {...(props as any)}
     />
   );
 }
@@ -47,7 +47,7 @@ function NavigationMenuItem({
     <NavigationMenuPrimitive.Item
       className={cn("relative", className)}
       data-slot="navigation-menu-item"
-      {...props}
+      {...(props as any)}
     />
   );
 }
@@ -148,7 +148,7 @@ function NavigationMenuIndicator({
         className
       )}
       data-slot="navigation-menu-indicator"
-      {...props}
+      {...(props as any)}
     >
       <div className="relative top-[60%] h-2 w-2 rotate-45 rounded-tl-sm bg-border shadow-md" />
     </NavigationMenuPrimitive.Icon>
