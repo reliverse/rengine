@@ -20,7 +20,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-tauri-plugin-dialog = "2.5.0"
+tauri-plugin-dialog = "2.6.0"
 tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -36,7 +36,28 @@ regex = "1.10"
 csv = "1.1"
 pest = "2.7"
 pest_derive = "2.7"
+# Bevy with rendering features enabled
+# Note: We enable default features to get full rendering support
+# When headless=true, rendering systems won't run but types will be available
+bevy = { version = "0.17", default-features = true }
+crossbeam-channel = "0.5"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-cli = "2"
 tauri-plugin-window-state = "2"
+
+# Enable a small amount of optimization in the dev profile.
+[profile.dev]
+opt-level = 1
+
+# Enable a large amount of optimization in the dev profile for dependencies.
+[profile.dev.package."*"]
+opt-level = 3
+
+# Enable more optimization in the release profile at the cost of compile time.
+[profile.release]
+# Compile the entire crate as one unit.
+# Slows compile times, marginal improvements.
+codegen-units = 1
+# Do a second optimization pass over the entire program, including dependencies.
+# Slows compile times, marginal improvements.
+lto = "thin"

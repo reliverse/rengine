@@ -3,6 +3,10 @@
 pub mod blueprint;
 pub mod models;
 pub mod renderware;
+pub mod bevy_app;
+pub mod bevy_bridge;
+pub mod bevy_scene;
+pub mod config;
 
 use crate::renderware::img::ImgArchive;
 use base64::{engine::general_purpose, Engine as _};
@@ -1527,14 +1531,159 @@ fn import_file_to_archive(
     Ok(())
 }
 
+// Bevy communication commands
+#[tauri::command]
+fn get_bevy_state(
+    receiver: tauri::State<crate::bevy_bridge::BevyStateReceiver>,
+) -> Option<crate::bevy_bridge::BevyState> {
+    receiver.0.try_recv().ok()
+}
+
+#[tauri::command]
+fn send_bevy_command(
+    command: crate::bevy_bridge::BevyCommand,
+    sender: tauri::State<crate::bevy_bridge::BevyCommandSender>,
+) -> Result<(), String> {
+    sender.0.send(command).map_err(|e| format!("Failed to send command: {}", e))
+}
+
+// Rengine configuration commands
+#[tauri::command]
+fn load_rengine_config(config_path: Option<String>) -> Result<crate::config::RengineConfig, String> {
+    let path = config_path.as_ref().map(|p| std::path::Path::new(p));
+    crate::config::RengineConfig::load(path)
+}
+
+#[tauri::command]
+fn save_rengine_config(
+    config: crate::config::RengineConfig,
+    config_path: Option<String>,
+) -> Result<(), String> {
+    let path = config_path.as_ref().map(|p| std::path::Path::new(p));
+    config.save(path)
+}
+
+#[tauri::command]
+fn get_rengine_config_path(config_path: Option<String>) -> String {
+    let path = config_path.as_ref().map(|p| std::path::Path::new(p));
+    crate::config::RengineConfig::get_config_path(path)
+        .to_string_lossy()
+        .to_string()
+}
+
+// Bevy scene synchronization commands
+#[tauri::command]
+fn sync_scene_to_bevy(
+    scene: crate::bevy_bridge::SceneState,
+    sender: tauri::State<crate::bevy_bridge::BevyCommandSender>,
+) -> Result<(), String> {
+    sender.0.send(crate::bevy_bridge::BevyCommand::SyncScene { scene })
+        .map_err(|e| format!("Failed to send scene sync: {}", e))
+}
+
+#[tauri::command]
+fn update_bevy_object(
+    object: crate::bevy_bridge::SceneObjectData,
+    sender: tauri::State<crate::bevy_bridge::BevyCommandSender>,
+) -> Result<(), String> {
+    sender.0.send(crate::bevy_bridge::BevyCommand::UpdateObject { object })
+        .map_err(|e| format!("Failed to send object update: {}", e))
+}
+
+#[tauri::command]
+fn add_bevy_object(
+    object: crate::bevy_bridge::SceneObjectData,
+    sender: tauri::State<crate::bevy_bridge::BevyCommandSender>,
+) -> Result<(), String> {
+    sender.0.send(crate::bevy_bridge::BevyCommand::AddObject { object })
+        .map_err(|e| format!("Failed to send add object: {}", e))
+}
+
+#[tauri::command]
+fn remove_bevy_object(
+    object_id: String,
+    sender: tauri::State<crate::bevy_bridge::BevyCommandSender>,
+) -> Result<(), String> {
+    sender.0.send(crate::bevy_bridge::BevyCommand::RemoveObject { object_id })
+        .map_err(|e| format!("Failed to send remove object: {}", e))
+}
+
+#[tauri::command]
+fn update_bevy_camera(
+    position: [f32; 3],
+    target: [f32; 3],
+    sender: tauri::State<crate::bevy_bridge::BevyCommandSender>,
+) -> Result<(), String> {
+    sender.0.send(crate::bevy_bridge::BevyCommand::CameraUpdate { position, target })
+        .map_err(|e| format!("Failed to send camera update: {}", e))
+}
+
+#[tauri::command]
+fn send_bevy_input(
+    event: String,
+    data: serde_json::Value,
+    sender: tauri::State<crate::bevy_bridge::BevyCommandSender>,
+) -> Result<(), String> {
+    sender.0.send(crate::bevy_bridge::BevyCommand::InputEvent { event, data })
+        .map_err(|e| format!("Failed to send input event: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    use crate::bevy_app::create_bevy_app;
+    use crate::bevy_bridge::{BevyCommandSender, BevyStateReceiver, BevyCommandReceiver, BevyStateSender};
+    use crate::config::RengineConfig;
+    use crossbeam_channel::bounded;
+    use std::thread;
+
+    // Load configuration
+    let config_path = RengineConfig::get_config_path(None);
+    log_info!("Loading config from: {}", config_path.display());
+    let config = RengineConfig::load(None).unwrap_or_else(|e| {
+        log_warn!("Failed to load rengine.json config: {}. Using defaults.", e);
+        RengineConfig::default()
+    });
+
+    // Determine effective renderer
+    let effective_renderer = config.effective_renderer();
+    log_info!("Rengine config loaded. Renderer: {:?} (raw: {:?})", effective_renderer, config.renderer);
+
+    // Create communication channels between Tauri and Bevy
+    let (command_tx, command_rx) = bounded::<crate::bevy_bridge::BevyCommand>(100);
+    let (state_tx, state_rx) = bounded::<crate::bevy_bridge::BevyState>(100);
+
+    // Only start Bevy if it's selected as the renderer
+    if config.is_bevy_enabled() {
+        // Clone channels for Bevy thread
+        let bevy_command_rx = BevyCommandReceiver(command_rx);
+        let bevy_state_tx = BevyStateSender(state_tx);
+        let bevy_fps = config.target_fps;
+        // Force headless mode when running in Tauri - we render to webview canvas, not a native window
+        // Native windows require the event loop to be on the main thread (cross-platform requirement),
+        // which conflicts with Tauri's main thread. This is especially strict on macOS and Linux.
+        let bevy_headless = true;
+
+        // Spawn Bevy in a separate thread
+        thread::spawn(move || {
+            let mut app = create_bevy_app(bevy_command_rx, bevy_state_tx, Some(bevy_fps), bevy_headless);
+            app.run();
+        });
+        log_info!("Bevy engine started (headless: true, FPS: {}) - rendering to webview canvas", bevy_fps);
+    } else {
+        log_info!("Bevy engine disabled - using {:?} renderer", effective_renderer);
+    }
+
+    // Create channel senders/receivers for Tauri
+    let command_sender = BevyCommandSender(command_tx);
+    let state_receiver = BevyStateReceiver(state_rx);
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .manage(command_sender)
+        .manage(state_receiver)
         .invoke_handler(tauri::generate_handler![
             greet,
             copy_to_clipboard,
@@ -1573,7 +1722,18 @@ pub fn run() {
             search_samp_models_by_name,
             get_all_samp_models_count,
             parse_blueprint_code,
-            generate_blueprint_code
+            generate_blueprint_code,
+            get_bevy_state,
+            send_bevy_command,
+            load_rengine_config,
+            save_rengine_config,
+            get_rengine_config_path,
+            sync_scene_to_bevy,
+            update_bevy_object,
+            add_bevy_object,
+            remove_bevy_object,
+            update_bevy_camera,
+            send_bevy_input
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

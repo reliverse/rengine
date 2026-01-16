@@ -14,9 +14,11 @@ import { useToast } from "~/hooks/use-toast";
 import { cn } from "~/lib/utils";
 import { useSceneStore } from "~/stores/scene-store";
 import { type ImportProgress, modelImporter } from "~/utils/model-import";
+import { useRendererConfig } from "~/hooks/use-renderer-config";
 import { PerformanceFooter } from "./performance-footer";
 import { LoadingFallback } from "./scene/loading-fallback";
 import { SceneRenderer } from "./scene/scene-renderer";
+import { BevyCanvas } from "./bevy-canvas";
 
 // Enable THREE.js ColorManagement for correct color representation
 // This is especially important when using global geometries and materials
@@ -67,6 +69,7 @@ function AdaptivePixelRatio() {
 const FIXED_DPR = 1.5;
 
 export function SceneCanvas() {
+  const { renderer, loading: configLoading } = useRendererConfig();
   const {
     cameraPosition,
     cameraTarget,
@@ -261,52 +264,61 @@ export function SceneCanvas() {
           </div>
         )}
 
-        <Canvas
-          camera={{
-            position: cameraPosition,
-            fov: 50,
-            near: 0.1,
-            far: 24_000,
-          }}
-          dpr={dpr}
-          frameloop="demand"
-          gl={{
-            antialias: true,
-            alpha: false,
-            powerPreference: "high-performance",
-            // Enable hardware acceleration optimizations
-            stencil: false,
-            depth: true,
-            logarithmicDepthBuffer: false,
-          }}
-          onCreated={({ camera, scene }) => {
-            camera.lookAt(...cameraTarget);
-            // Set scene background color
-            scene.background = new THREE.Color(backgroundColor);
-          }}
-          shadows
-        >
-          {/* Fog */}
-          {fogEnabled && (
-            <fog args={[fogColor, fogNear, fogFar]} attach="fog" />
-          )}
-          <Suspense fallback={<LoadingFallback />}>
-            <SceneRenderer controlsRef={controlsRef} />
-            <ControlsInvalidator
-              dampingFactor={0.05}
-              enableDamping={true}
-              enabled={!transformDragging}
-              enablePan={true}
-              enableRotate={true}
-              enableZoom={true}
-              maxDistance={24_000}
-              minDistance={1}
-              onChange={handleControlsChange}
-              target={cameraTarget}
-            />
-            <AdaptivePixelRatio />
-          </Suspense>
-        </Canvas>
+        {/* Conditionally render based on renderer config */}
+        {configLoading ? (
+          <div className="flex h-full w-full items-center justify-center">
+            <div className="text-white">Loading renderer config...</div>
+          </div>
+        ) : renderer === "bevy" ? (
+          <BevyCanvas className="h-full w-full" />
+        ) : (
+          <Canvas
+            camera={{
+              position: cameraPosition,
+              fov: 50,
+              near: 0.1,
+              far: 24_000,
+            }}
+            dpr={dpr}
+            frameloop="demand"
+            gl={{
+              antialias: true,
+              alpha: false,
+              powerPreference: "high-performance",
+              // Enable hardware acceleration optimizations
+              stencil: false,
+              depth: true,
+              logarithmicDepthBuffer: false,
+            }}
+            onCreated={({ camera, scene }) => {
+              camera.lookAt(...cameraTarget);
+              // Set scene background color
+              scene.background = new THREE.Color(backgroundColor);
+            }}
+            shadows
+          >
+            {/* Fog */}
+            {fogEnabled && (
+              <fog args={[fogColor, fogNear, fogFar]} attach="fog" />
+            )}
+            <Suspense fallback={<LoadingFallback />}>
+              <SceneRenderer controlsRef={controlsRef} />
+              <ControlsInvalidator
+                dampingFactor={0.05}
+                enableDamping={true}
+                enabled={!transformDragging}
+                enablePan={true}
+                enableRotate={true}
+                enableZoom={true}
+                maxDistance={24_000}
+                minDistance={1}
+                onChange={handleControlsChange}
+                target={cameraTarget}
+              />
+              <AdaptivePixelRatio />
+            </Suspense>
+          </Canvas>
+        )}
       </div>
 
       {/* Performance Footer - Always visible */}

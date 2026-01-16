@@ -1,0 +1,10 @@
+{
+  "renderer": "r3f",
+  "headless": true,
+  "target_fps": 60,
+  "antialias": true,
+  "shadows": true,
+  "pixel_ratio": 1.0,
+  "debug": false,
+  "log_level": "info"
+}
