@@ -1,0 +1,21 @@
+{
+  "width": 358,
+  "height": 561,
+  "tileSize": 0,
+  "borderSize": 6,
+  "cs": 0.2,
+  "ch": 0.25,
+  "bmin": [-24.383984, -0.4064, -18.287987],
+  "bmax": [47.142368, 26.00959, 93.878334],
+  "walkableSlopeAngle": 38.0,
+  "walkableHeight": 8,
+  "walkableClimb": 6,
+  "walkableRadius": 3,
+  "maxEdgeLen": 55,
+  "maxSimplificationError": 0.9,
+  "minRegionArea": 196,
+  "mergeRegionArea": 625,
+  "maxVertsPerPoly": 6,
+  "detailSampleDist": 1.2,
+  "detailSampleMaxError": 0.25
+}

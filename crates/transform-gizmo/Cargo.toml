@@ -1,0 +1,52 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "examples/*"]
+
+[workspace.package]
+version = "0.6.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/urholaukkarinen/transform-gizmo"
+repository = "https://github.com/urholaukkarinen/transform-gizmo"
+authors = ["Urho Laukkarinen <urho.laukkarinen@gmail.com>"]
+publish = false
+
+[workspace.dependencies]
+transform-gizmo = { version = "0.6.1", path = "crates/transform-gizmo" }
+transform-gizmo-bevy = { version = "0.6.1", path = "crates/transform-gizmo-bevy" }
+
+egui = "0.31.1"
+eframe = "0.29"
+emath = "0.29"
+epaint = "0.29"
+ecolor = "0.29"
+glam = { version = "0.29.1", features = ["mint"] }
+mint = "0.5"
+enum_dispatch = "0.3.12"
+ahash = "0.8.7"
+enumset = "1.1.3"
+bytemuck = "1.5"
+uuid = "1.1"
+bevy = "0.18"
+
+bevy_app = "0.18"
+bevy_image = "0.18"
+bevy_derive = "0.18"
+bevy_core_pipeline = "0.18"
+bevy_reflect = "0.18"
+bevy_math = "0.18"
+bevy_render = "0.18"
+bevy_input = "0.18"
+bevy_asset = "0.18"
+bevy_utils = "0.18"
+bevy_pbr = "0.18"
+bevy_ecs = "0.18"
+bevy_log = "0.18"
+bevy_window = "0.18"
+bevy_transform = "0.18"
+
+
+[profile.release]
+opt-level = "s"
+panic = "abort"
+ 

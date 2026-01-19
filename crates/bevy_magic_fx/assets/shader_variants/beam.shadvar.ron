@@ -1,0 +1,26 @@
+(
+   
+    texture: "textures/fx_fireskill/Gradient_Beam_007.tga",
+    animation_speed: (0.5,0.0),  
+
+    distortion_speed: (0.02,0.01),
+    scroll_repeats: ( 1.0,1.0),
+    distortion_amount: 0.02 , 
+    fresnel_power: Some(2.0),
+
+    color: LinearRgba((
+            red: 0.2,
+            green: 0.3,
+            blue: 0.2,
+            alpha: 0.8
+       ) ),
+     emissive: LinearRgba((
+              red: 4.0,
+             green: 0.3,
+             blue: 70.0,
+             alpha: 3.6
+        ) )
+      
+)
+
+ 

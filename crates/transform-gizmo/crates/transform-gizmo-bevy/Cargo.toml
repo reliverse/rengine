@@ -1,0 +1,45 @@
+[package]
+name = "transform-gizmo-bevy"
+description = "bevy integration for transform-gizmo"
+version = "0.6.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/urholaukkarinen/transform-gizmo"
+repository = "https://github.com/urholaukkarinen/transform-gizmo"
+authors = ["Urho Laukkarinen <urho.laukkarinen@gmail.com>"]
+categories = ["gui", "game-development", "game-engines"]
+keywords = ["gizmo", "bevy"]
+readme = "../../README.md"
+include = [
+    "../../LICENSE-APACHE",
+    "../../LICENSE-MIT",
+    "**/*.rs",
+    "**/*.wgsl",
+    "Cargo.toml",
+]
+
+[dependencies]
+transform-gizmo = { path = "../transform-gizmo" }
+
+bevy = "0.18"
+bevy_app = "0.18"
+bevy_core_pipeline = "0.18"
+bevy_reflect = "0.18"
+bevy_math = "0.18"
+bevy_render = "0.18"
+bevy_input = "0.18"
+bevy_asset = "0.18"
+bevy_utils = "0.18"
+bevy_image = "0.18"
+bevy_derive = "0.18"
+bevy_pbr = "0.18"
+bevy_ecs = "0.18"
+bevy_log = "0.18"
+bevy_window = "0.18"
+bevy_transform = "0.18"
+bytemuck = "1.5"
+uuid = "1.1"
+
+[dev-dependencies]
+bevy = "0.18"
+ 

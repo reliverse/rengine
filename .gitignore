@@ -1,39 +1,19 @@
-# Temp
-temp/
-tmp/
-logs
-*.log
+/target
+ 
+artifacts/**
+assets/models/doodads_broken/**
+assets/models/doodads/**
+assets/models/units/**
+assets/textures/vfx_textures/**
+assets/textures/fx_fireskill/**
+assets/textures/kenney/**
+assets/textures/material_overrides/**
+# assets/**/manifest.ron
 
-# TanStack
-node_modules
-.DS_Store
-dist
-dist-ssr
-count.txt
-.nitro
-.tanstack
-.wrangler
-mcp-todos.json.output
-.vinxi
-todos.json
-*.local
+opensrc/
 
-# Editor directories and files
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+/example_game_assets/
 
-# Env
-.env
-.env.local
+migration_progress.md
 
-# React Router
-/.react-router/
-/build/
-
-# Large files
-*.img
+cargo-check-errors.txt

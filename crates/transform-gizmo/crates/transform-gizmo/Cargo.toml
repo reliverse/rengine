@@ -1,0 +1,24 @@
+[package]
+name = "transform-gizmo"
+description = "3D transformation gizmo"
+version = "0.6.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/urholaukkarinen/transform-gizmo"
+repository = "https://github.com/urholaukkarinen/transform-gizmo"
+authors = ["Urho Laukkarinen <urho.laukkarinen@gmail.com>"]
+categories = ["gui", "game-development", "game-engines"]
+keywords = ["gizmo"]
+readme = "../../README.md"
+include = ["../../LICENSE-APACHE", "../../LICENSE-MIT", "**/*.rs", "Cargo.toml"]
+
+[dependencies]
+emath = "0.29"
+epaint = "0.29"
+ecolor = "0.29"
+glam = { version = "0.29.1", features = ["mint"] }
+mint = "0.5"
+enum_dispatch = "0.3.12"
+ahash = "0.8.7"
+enumset = "1.1.3"
+ 

@@ -1,0 +1,45 @@
+[package]
+name = "bevy_mod_debugdump"
+version = "0.15.0"
+repository = "https://github.com/jakobhellermann/bevy_mod_debugdump"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+description = "Visualization tools for bevy"
+keywords = ["bevy", "schedule", "visual", "render", "graph"]
+authors = ["Jakob Hellermann <jakob.hellermann@protonmail.com>"]
+edition = "2021"
+exclude = ["docs/*"]
+
+[features]
+default = ["cli", "render_graph"]
+cli = ["dep:lexopt"]
+render_graph = ["dep:bevy_render"]
+
+[dependencies]
+bevy_app = { version = "0.18.0" }
+bevy_color = { version = "0.18.0" }
+bevy_ecs = { version = "0.18.0" }
+bevy_log = { version = "0.18.0" }
+bevy_platform = { version = "0.18.0" }
+bevy_render = { version = "0.18.0", optional = true }
+bevy_utils = { version = "0.18.0", features = ["debug"] }
+disqualified = "1.0"
+lexopt = { version = "0.3.0", optional = true }
+
+[dev-dependencies]
+bevy = { version = "0.18.0" }
+
+[[example]]
+name = "generate_docs"
+required-features = ["render_graph"]
+
+[[example]]
+name = "print_render_graph"
+required-features = ["render_graph"]
+
+# [patch.crates-io]
+# bevy_ecs = { path = "../bevy/crates/bevy_ecs" }
+# bevy_app = { path = "../bevy/crates/bevy_app" }
+# bevy_utils = { path = "../bevy/crates/bevy_utils" }
+# bevy_render = { path = "../bevy/crates/bevy_render" }
+# bevy = { path = "../bevy" }

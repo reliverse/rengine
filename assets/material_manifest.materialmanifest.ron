@@ -1,0 +1,100 @@
+(
+    override_materials: [
+
+        "Portal1",
+         "StoneBrickPixelFixedUv",
+
+
+          "MetalMeshWall",
+
+      "CaveGround",
+      "CaveWall",
+
+      "DwarvenRock",
+      "DwarvenStone",
+      "DwarvenTile",
+
+      "Wall1",
+      "Wall1Dark",
+      "Wall2",
+
+       "CrackedEarth",
+
+       "FireVertical",
+
+      "RocksFixedWhite",
+      "RocksFixedDark",
+
+      "RocksAdamantite",
+       
+       "DirtPixel",
+        "CobblesPixel",
+      
+       "StonePixel",
+       "StonePixelAlt",
+
+       "MISSING_ASSET",
+
+
+        "BrickPixel",
+       "BrickPixelAlt",
+
+       "StoneBrickPixel",
+        "StoneBrick2Pixel",
+         "StoneBrick3Pixel",
+          "StoneBrick4Pixel",
+          "StoneBrick5Pixel",
+          "StoneBrick6Pixel",
+
+       "GravelPixel",
+        "Gravel2Pixel",
+         "Gravel3Pixel",
+
+       "StoneTilePixel",
+        
+
+       "CobbleWallPixel", 
+          "CobbleWall2Pixel", 
+           "CobbleWall3Pixel", 
+
+
+       "DungeonVoidPixel",   
+
+
+      "DarkElfStoneDark",
+
+           "CainosDungeon",
+        "CainosDungeonDark",
+
+
+
+       "SlateDark",
+      "ToonStone",
+      "StoneWall1",
+      "EarthStone1",
+      "EarthStone2",
+       "EarthStone3",
+ 
+      "WoodFloor",
+      "RockyEarthFixed",
+
+      "OrnateTiles1",
+      "OrnateTiles2",
+      "OrnateTiles3",
+      "OrnateTiles4",
+
+       "SlateCliff",
+
+      "StoneCliff1",
+      "StoneCliff2",
+      "StoneCliff3",
+      
+      "Cobbles1",
+      "Cobbles2",
+      "Cobbles3",
+      
+      "AcademyWood",
+
+
+    ]
+  )

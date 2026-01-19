@@ -1,0 +1,169 @@
+  (
+    terrain_definitions: [
+
+
+        (
+            name: "grass1",
+           
+        ),
+
+         (
+            name: "grass2",
+           
+        ),
+
+         (
+            name: "grass dirt",
+           
+        ),
+
+
+         (
+            name: "stonewall + ivy 2",
+           
+        ),
+
+         (
+            name: "dirt1",
+           
+        ),
+
+         (
+            name: "dirt2",
+           
+        ),
+
+         (
+            name: "dirt3",
+           
+        ),
+         (
+            name: "gravel1",
+           
+        ),
+
+         (
+            name: "gravel2",
+           
+        ),
+
+        (
+            name: "rocks purple",
+           
+        ),
+
+
+        (
+            name: "stone roots",
+           
+        ),
+
+
+
+        (
+            name: "magic grass",
+           
+        ),
+
+        (
+            name: "magic swamp",
+           
+        ),
+
+         (
+            name: "ice",
+           
+        ),
+
+
+         (
+            name: "snow",
+           
+        ),
+
+
+         (
+            name: "snow2",
+           
+        ),
+
+
+         (
+            name: "green cracks",
+           
+        ),
+
+           (
+            name: "purple cracks",
+           
+        ),
+
+         (
+            name: "stone wall",
+           
+        ),
+
+        (
+            name: "stone wall 2",
+           
+        ),
+
+        (
+            name: "stone wall 3",
+           
+        ),
+
+          (
+            name: "stone wall dark",
+           
+        ),
+
+          (
+            name: "stone wall medium",
+           
+        ),
+
+        (
+            name: "stone wall magic",
+           
+        ),
+
+        (
+            name: "leafy",
+           
+        ),
+
+           (
+            name: "forest_leafy",
+           
+        ),
+
+           (
+            name: "hard sand",
+           
+        ),
+         (
+            name: "soft sand",
+           
+        ),
+
+          (
+            name: "swamp1",
+           
+        ),
+            (
+            name: "swamp2",
+           
+        ),
+          (
+            name: "swamp3",
+           
+        ),
+   (
+            name: "shadow",
+           
+        ),
+
+
+	]
+)

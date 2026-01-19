@@ -1,0 +1,13 @@
+/target
+/Cargo.lock
+
+
+/docs/*.dot
+/compare
+
+/*.dot
+/*.svg
+*.png
+
+/web
+/debugdumpgen

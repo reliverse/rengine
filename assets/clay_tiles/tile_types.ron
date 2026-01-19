@@ -1,0 +1,152 @@
+(
+
+  tile_types: [
+
+  	//texture index 0 
+  		(
+  		  name: "gray_bricks",
+         material_name:  "TiledBricks1", 
+         ), 
+       
+    (
+        name: "gray_brickwall",
+        material_name:  "TiledBricks2", 
+        
+      ),
+
+
+     (
+        name: "stucco_1",
+         material_name:  "TiledStuccoLight", 
+         
+      ),
+
+
+      (
+        name: "wood_1",
+         material_name:  "TiledWood3", 
+             ),
+
+
+      (
+        name: "promenade",
+         material_name:  "TiledWall1", 
+        
+      ),
+
+       (
+        name: "roof_tiles",
+       material_name:  "TiledWall1", 
+       
+      ),
+
+
+         (
+        name: "mezzanine",
+        material_name:  "TiledWall1", 
+         
+      ),
+
+
+
+         (
+        name: "marble",
+        material_name:  "TiledMarble", 
+         
+      ),
+
+         // index 8 
+      (
+        name: "stucco_dark",
+        material_name:  "TiledStuccoDark", 
+       
+      ),
+
+         (
+        name: "marble_dark",
+         material_name:  "TiledMarbleDark", 
+       
+      ),
+
+
+
+       (
+        name: "ornate_tiles_1",
+         material_name:  "TiledTiles3", 
+        
+      ),
+
+     (
+        name: "ornate_tiles_2",
+        material_name:  "TiledTiles4", 
+         
+      ),
+
+
+     (
+        name: "simple_tiles_1",
+         material_name:  "TiledTiles1", 
+        
+      ),
+
+     (
+        name: "simple_tiles_2",
+         material_name:  "TiledTiles2", 
+        
+      ),
+
+
+     (
+        name: "wood_2",
+        material_name:  "TiledWood4", 
+       
+      ),
+
+     (
+        name: "wood_3",
+        material_name:  "TiledWood5", 
+         
+      ),
+
+      (
+        name: "cobbles1",
+        material_name:  "TiledCobbles1", 
+         
+      ),
+
+       (
+        name: "cobbles2",
+        material_name:  "TiledCobbles2", 
+         
+      ),
+
+
+      (
+        name: "cobbles3",
+        material_name:  "TiledCobbles3", 
+         
+      ),
+
+      (
+        name: "cobbles4",
+        material_name:  "TiledCobbles4", 
+         
+      ),
+
+       (
+        name: "rocks1",
+        material_name:  "TiledRocks1", 
+         
+      ),
+
+       (
+        name: "rocks2",
+        material_name:  "TiledRocks2", 
+         
+      ),
+
+
+  ]
+
+
+)

@@ -21,6 +21,8 @@ Biome (the underlying engine) provides extremely fast Rust-based linting and for
 - Write code that is **accessible, performant, type-safe, and maintainable**.
 - Focus on clarity and explicit intent over brevity.
 - Never launch app, user doing this manually.
+- Never launch and never build the app, user doing this manually.
+- Use `bun check` to check the codebase for issues. This will run the type checker, the linter, and other checks.
 
 ### Type Safety & Explicitness
 

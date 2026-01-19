@@ -1,0 +1,39 @@
+# Temp
+temp/
+tmp/
+logs
+*.log
+
+# TanStack
+node_modules
+.DS_Store
+dist
+dist-ssr
+count.txt
+.nitro
+.tanstack
+.wrangler
+mcp-todos.json.output
+.vinxi
+todos.json
+*.local
+
+# Editor directories and files
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Env
+.env
+.env.local
+
+# React Router
+/.react-router/
+/build/
+
+# Large files
+*.img

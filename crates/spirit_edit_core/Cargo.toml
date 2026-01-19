@@ -1,0 +1,32 @@
+[package]
+name = "spirit_edit_core"
+description = "A utility library for Rengine"
+version = "0.16.3"
+edition = "2021"
+authors = ["ethereumdegen"]
+license = "MIT"
+
+keywords = ["bevy", "editor"]
+categories = ["game-development", "gui", "visualization"]
+exclude = ["assets"]
+
+
+[dependencies]
+
+bevy = "0.18.0"
+
+#remove me ? 
+bevy_egui = "0.39.0"
+
+
+bevy_clay_tiles = { path = "../bevy_clay_tiles" }
+
+serde = { version = "1", features = ["derive"] }
+
+
+bevy_common_assets = { version = "0.15.0", features = ["ron"] }
+
+
+ron = "0.8.1"
+
+rand = "0.8"

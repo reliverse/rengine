@@ -1,0 +1,45 @@
+[package]
+name = "bevy_foliage_tool"
+description = "A configurable foliage painting system using perlin noise, grayscale maps, and chunked visibility"
+ 
+ 
+version = "0.16.2"
+ 
+ 
+edition = "2024"
+authors = [ "ethereumdegen" ]
+license = "MIT"
+readme = "readme.md"
+repository = "https://github.com/ethereumdegen/bevy_foliage_tool"
+exclude = [ "/assets/", "/examples/" ]
+keywords = [ "foliage" , "bevy" ]
+
+
+[dependencies]
+anyhow = "1.0.75"
+bevy = "0.18.0"
+
+futures-lite = "1.13.0"
+image = "0.25.1" 
+png = "0.17.11"
+ron = "0.8.1"
+serde = { version = "1.0", features = ["derive"] }
+ 
+
+thiserror = "1.0.48"
+ 
+  
+serde_json = "1.0.113"
+ 
+rand = "0.8.5"
+noise = "0.9.0"
+bincode = "1.3.3"
+
+
+[dev-dependencies]
+bevy_obj = { path = "../bevy_obj" }
+ 
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
+
