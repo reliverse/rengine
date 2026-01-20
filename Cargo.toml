@@ -17,7 +17,7 @@ bevy = { version = "0.18.0", features = [
 ] }
 
 
-iyes_perf_ui = { path = "crates/iyes_perf_ui" }
+iyes_perf_ui = { path = "crates/bevy/iyes_perf_ui" }
 
 
 bevy_egui = "0.39.0"
@@ -31,37 +31,37 @@ winit = { version = "0.30", default-features = false }
 
 avian3d = { version = "0.5", features = ["serialize"] }
 
-bevy_rerecast = { path = "crates/rerecast/crates/bevy_rerecast" }
-avian_rerecast = { path = "crates/rerecast/crates/avian_rerecast" }
+bevy_rerecast = { path = "crates/bevy/rerecast/crates/bevy_rerecast" }
+avian_rerecast = { path = "crates/bevy/rerecast/crates/avian_rerecast" }
 
 
-degen_toon_terrain = { path = "crates/degen_toon_terrain", features = [
+degen_toon_terrain = { path = "crates/bevy/degen_toon_terrain", features = [
   "physics",
 ] }
 #degen_toon_terrain =  {path="../degen_toon_terrain", features=["physics"]}
 
 
-bevy_material_wizard = { path = "crates/bevy_material_wizard" }
+bevy_material_wizard = { path = "crates/bevy/bevy_material_wizard" }
 # bevy_material_wizard = {path="../bevy_material_wizard"}
 
 bevy_materialize = "0.9.0"
 
 
-bevy_magic_fx = { path = "crates/bevy_magic_fx" }
+bevy_magic_fx = { path = "crates/bevy/bevy_magic_fx" }
 # bevy_magic_fx = {path="../bevy_magic_fx"}
 
 
-degen_toon_water = { path = "crates/degen_toon_water" }
+degen_toon_water = { path = "crates/bevy/degen_toon_water" }
 #degen_toon_water =  {path="../degen_toon_water"}
 
 
-degen_toon_clouds = { path = "crates/degen_toon_clouds" }
+degen_toon_clouds = { path = "crates/bevy/degen_toon_clouds" }
 
 
-bevy_regions = { path = "crates/bevy_regions" }
+bevy_regions = { path = "crates/bevy/bevy_regions" }
 
 
-bevy_clay_tiles = { path = "crates/bevy_clay_tiles" }
+bevy_clay_tiles = { path = "crates/bevy/bevy_clay_tiles" }
 # bevy_clay_tiles =  {path="../bevy_clay_tiles"}
 
 
@@ -89,7 +89,7 @@ bevy_editor_pls_core.workspace = true
 bevy_editor_pls_default_windows = { workspace = true }
 
 #i want to dclare it like this but it errors 
-bevy_obj = { path = "crates/bevy_obj", default-features = false, features = [
+bevy_obj = { path = "crates/bevy/bevy_obj", default-features = false, features = [
   "mesh",
 ] }
 #bevy_obj=  {git="https://github.com/ethereumdegen/bevy_obj" ,  default-features = false , features= ["mesh"] }   
@@ -100,10 +100,10 @@ bevy-inspector-egui = "0.36.0"
 bevy_asset_loader = "0.25.0"
 
 
-bevy_foliage_tool = { path = "crates/bevy_foliage_tool" }
+bevy_foliage_tool = { path = "crates/bevy/bevy_foliage_tool" }
 # bevy_foliage_tool =   {path = "../bevy_foliage_tool"}
 
-bevy_mesh_outline = { path = "crates/bevy_mesh_outline" }
+bevy_mesh_outline = { path = "crates/bevy/bevy_mesh_outline" }
 
 # bevy_toon_shader =  { git = "https://github.com/tbillington/bevy_toon_shader"}
 
@@ -122,29 +122,29 @@ readme = "README.md"
 
 
 [workspace]
-members = ["crates/*"]
-exclude = ["crates/rerecast", "crates/transform-gizmo", "tauri-r3f/src-tauri"]
+members = ["crates/bevy/*", "crates/core", "crates/godot/rw"]
+exclude = ["crates/bevy/rerecast", "crates/bevy/transform-gizmo", "adapters/fiber/src-tauri", "adapters/godot"]
 resolver = "2"
 
 
 [workspace.dependencies]
-bevy_editor_pls = { version = "0.8.2", path = "crates/bevy_editor_pls" }
-bevy_editor_pls_core = { version = "0.8.2", path = "crates/bevy_editor_pls_core" }
-bevy_editor_pls_default_windows = { version = "0.8.2", path = "crates/bevy_editor_pls_default_windows" }
+bevy_editor_pls = { version = "0.8.2", path = "crates/bevy/bevy_editor_pls" }
+bevy_editor_pls_core = { version = "0.8.2", path = "crates/bevy/bevy_editor_pls_core" }
+bevy_editor_pls_default_windows = { version = "0.8.2", path = "crates/bevy/bevy_editor_pls_default_windows" }
 
-spirit_edit_core = { path = "crates/spirit_edit_core" }
+spirit_edit_core = { path = "crates/bevy/spirit_edit_core" }
 #spirit_edit_core = {path="../spirit_edit_core"}
 
 anyhow = "1"
 bevy-inspector-egui = "0.36.0"
-
+bevy_egui = "0.39.0"
 
 egui = "0.31"
 
 egui_dock = "0.16" # ?? 
 # egui-gizmo = "0.16"  # deprecated ? 
 
-transform-gizmo-bevy = { path = "crates/transform-gizmo/crates/transform-gizmo-bevy" }
+transform-gizmo-bevy = { path = "crates/bevy/transform-gizmo/crates/transform-gizmo-bevy" }
 #transform-gizmo-bevy= {git= "https://github.com/ethereumdegen/transform-gizmo", branch="main"}
 # transform-gizmo-bevy= {path = "../transform-gizmo/crates/transform-gizmo-bevy"}
 

@@ -80,5 +80,6 @@
   },
   "[mdx]": {
     "editor.defaultFormatter": "biomejs.biome"
-  }
+  },
+  "godotTools.editorPath.godot4": "/home/blefnk/B/A/godot/godot4"
 }

@@ -4,6 +4,7 @@
   "type": "module",
   "packageManager": "bun@1.3.5",
   "scripts": {
+    "gd": "godot4 ./examples/godot/rw/project.godot",
     "pub": "bun run build && bun dler publish",
     "latest": "bun dler update && bun check",
     "build": "bun clean:build && bun check && bun dler build --loggerClearInternals",
@@ -27,7 +28,7 @@
   },
   "workspaces": {
     "packages": [
-      "tauri-r3f"
+      "adapters/*"
     ],
     "catalog": {}
   },

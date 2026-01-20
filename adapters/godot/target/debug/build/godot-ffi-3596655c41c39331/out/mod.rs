@@ -1,0 +1,10 @@
+pub mod table_builtins;
+pub mod table_builtins_lifecycle;
+pub mod table_core_classes;
+pub mod table_servers_classes;
+pub mod table_scene_classes;
+pub mod table_editor_classes;
+pub mod table_utilities;
+pub mod central;
+pub mod gdextension_interface;
+pub mod interface;

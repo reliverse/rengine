@@ -489,7 +489,7 @@ pub fn copy_game_assets_into_artifacts(
 
  //  if let Some( editor_config  ) = editor_config_assets.get( editor_config_handle ){
 
-    let default_external_assets_path = "./example_game_assets".to_string();
+    let default_external_assets_path = "./examples/bevy/example_game_assets".to_string();
     let external_assets_folder = editor_config.get_external_game_assets_folder().unwrap_or(   &default_external_assets_path   );
   
 

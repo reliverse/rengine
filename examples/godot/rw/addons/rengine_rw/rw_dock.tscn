@@ -1,0 +1,56 @@
+[gd_scene load_steps=3 format=3 uid="uid://dock_scene"]
+
+[ext_resource type="Script" path="res://addons/rengine_rw/rw_dock.gd" id="1"]
+
+[node name="RwDock" type="Control"]
+focus_mode = 2  # Click focus
+script = ExtResource("1")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Rengine RenderWare Tools"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="AnalyzeFileButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Analyze Any File (Ctrl+A)"
+
+[node name="ParseImgButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Parse IMG Archive (Ctrl+I)"
+
+[node name="ParseDffButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Parse DFF Model (Ctrl+D)"
+
+[node name="ClearButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Clear Output (Ctrl+C)"
+
+[node name="OutputText" type="TextEdit" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 150)
+text = "Select a file to analyze..."
+editable = false
+wrap_mode = 1
+scroll_fit_content_height = true
+
+[connection signal="pressed" from="VBoxContainer/AnalyzeFileButton" to="." method="on_analyze_file_pressed"]
+[connection signal="pressed" from="VBoxContainer/ParseImgButton" to="." method="on_parse_img_pressed"]
+[connection signal="pressed" from="VBoxContainer/ParseDffButton" to="." method="on_parse_dff_pressed"]
+[connection signal="pressed" from="VBoxContainer/ClearButton" to="." method="on_clear_pressed"]

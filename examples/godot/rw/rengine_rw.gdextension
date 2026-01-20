@@ -1,0 +1,17 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.2
+reloadable = true
+
+[libraries]
+linux.debug.x86_64 = "res://librengine_godot_rw.so"
+linux.release.x86_64 = "res://librengine_godot_rw.so"
+windows.debug.x86_64 = "res://rengine_godot_rw.dll"
+windows.release.x86_64 = "res://rengine_godot_rw.dll"
+macos.debug = "res://librengine_godot_rw.dylib"
+macos.release = "res://librengine_godot_rw.dylib"
+macos.debug.arm64 = "res://librengine_godot_rw.dylib"
+macos.release.arm64 = "res://librengine_godot_rw.dylib"
+
+[icons]
+RwEditorPlugin = "res://icon.svg"

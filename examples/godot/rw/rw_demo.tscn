@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3 uid="uid://rw_demo_scene"]
+
+[sub_resource type="GDScript" id="1"]
+script/source = "
+extends Node
+
+@onready var rw_analyzer = $RwAnalyzer
+
+func _ready():
+	print(\"Rengine RenderWare Demo Scene\")
+	print(\"Use the 'Rengine RenderWare Tools' panel in the editor dock to analyze files.\")
+"
+
+[node name="RwDemo" type="Node"]
+script = SubResource("1")
+
+[node name="RwAnalyzer" type="RwAnalyzer" parent="."]

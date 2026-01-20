@@ -1,4 +1,4 @@
-/target
+target
  
 artifacts/**
 assets/models/doodads_broken/**
@@ -12,8 +12,12 @@ assets/textures/material_overrides/**
 
 opensrc/
 
-/example_game_assets/
+/examples/bevy/example_game_assets/
 
 migration_progress.md
 
 cargo-check-errors.txt
+
+*.so
+*.rlib
+*.rmeta

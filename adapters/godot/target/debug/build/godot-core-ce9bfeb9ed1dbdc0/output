@@ -1,0 +1,31 @@
+Parsed extension_api.json for version JsonHeader { version_major: 4, version_minor: 5, version_patch: 0, version_status: "stable", version_build: "official", version_full_name: "Godot Engine v4.5.stable.official" }
+cargo:rerun-if-changed=build.rs
+cargo:rustc-check-cfg=cfg(published_docs, values(none()))
+cargo:rustc-check-cfg=cfg(since_api, values("4.2"))
+cargo:rustc-check-cfg=cfg(before_api, values("4.2"))
+cargo:rustc-check-cfg=cfg(since_api, values("4.3"))
+cargo:rustc-check-cfg=cfg(before_api, values("4.3"))
+cargo:rustc-check-cfg=cfg(since_api, values("4.4"))
+cargo:rustc-check-cfg=cfg(before_api, values("4.4"))
+cargo:rustc-check-cfg=cfg(since_api, values("4.5"))
+cargo:rustc-check-cfg=cfg(before_api, values("4.5"))
+cargo:rustc-check-cfg=cfg(since_api, values("4.6"))
+cargo:rustc-check-cfg=cfg(before_api, values("4.6"))
+cargo:rustc-cfg=since_api="4.1"
+cargo:rustc-cfg=since_api="4.2"
+cargo:rustc-cfg=since_api="4.3"
+cargo:rustc-cfg=since_api="4.4"
+cargo:rustc-cfg=since_api="4.5"
+cargo:rustc-cfg=before_api="4.6"
+cargo:rustc-cfg=before_patch_api="4.2.0"
+cargo:rustc-cfg=before_patch_api="4.2.1"
+cargo:rustc-cfg=before_patch_api="4.2.2"
+cargo:rustc-cfg=before_patch_api="4.3.0"
+cargo:rustc-cfg=before_patch_api="4.4.0"
+cargo:rustc-cfg=since_patch_api="4.5.0"
+cargo:rustc-cfg=since_patch_api="4.6.0"
+cargo:rustc-check-cfg=cfg(wasm_nothreads, values(none()))
+cargo:rustc-check-cfg=cfg(safeguards_balanced)
+cargo:rustc-check-cfg=cfg(safeguards_strict)
+cargo:rustc-cfg=safeguards_balanced
+cargo:rustc-cfg=safeguards_strict

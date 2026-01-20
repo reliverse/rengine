@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3 uid="uid://b1f4w2g6h8kak"]
+
+[ext_resource type="Texture2D" uid="uid://dqvwk2155jx5s" path="res://icon.svg" id="1"]
+
+[sub_resource type="GDScript" id="2"]
+script/source = "
+extends Sprite2D
+
+func _ready():
+	print(\"Hello from GDScript!\")
+"
+
+[node name="Main" type="Node2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1")
+script = SubResource("2")

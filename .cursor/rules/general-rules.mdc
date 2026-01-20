@@ -3,9 +3,13 @@ alwaysApply: true
 ---
 # General Rules
 
+- Use absolute paths when interacting with bash tools.
+
+## About Project
+
 Rengine is a modern 3D and 2D game engine.
 
 There is two editions:
 
 - `./` - egui + Bevy 0.18 + etc. More experimental.
-- `./tauri-r3f` - Tauri 2.0 + React + Three.js + etc. More stable.
+- `./adapters/fiber` - Tauri 2.0 + React + Three.js + etc. More stable.

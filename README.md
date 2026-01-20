@@ -5,11 +5,12 @@ Rengine is a modern 3D and 2D game engine.
 There is two editions:
 
 1. `./` - egui + Bevy 0.18 + etc. More experimental, missing features.
-2. `./tauri-r3f` - Tauri 2.0 + React + Three.js + etc. More stable.
+2. `./adapters/fiber` - Tauri 2.0 + React + Three.js + etc. More stable.
+3. `./adapters/godot` - Godot 4.5.1 + Rust + etc. More experimental, missing features.
 
 ---
 
-**Note**: Everything below describes the Bevy edition of Rengine. For the Tauri edition, see [./tauri-r3f/README.md](./tauri-r3f/README.md).
+**Note**: Everything below describes the Bevy edition of Rengine. For the Tauri edition, see [./adapters/fiber/README.md](./adapters/fiber/README.md).
 
 ## Rengine
 
@@ -46,11 +47,11 @@ This will use load the sample zone with a single cube.   If you try to load the 
 
 ```
 
-For now, set it to None. If you set it to None, then it will work and will only load a default sample doodad manifest.  In order to actually place more types of doodads in your editor, you will need to point this at a repo path which contains a subfolder "doodad_manifests" which contains all of your doodad manifest files.  (spirit_edit_core/src/doodads/doodad_manifest.rs has the struct to show you the architecture for this RON file ) (an example is found in example_game_assets).
+For now, set it to None. If you set it to None, then it will work and will only load a default sample doodad manifest.  In order to actually place more types of doodads in your editor, you will need to point this at a repo path which contains a subfolder "doodad_manifests" which contains all of your doodad manifest files.  (spirit_edit_core/src/doodads/doodad_manifest.rs has the struct to show you the architecture for this RON file ) (an example is found in /examples/bevy/example_game_assets).
 
 On boot up of the editor, the contents of this external game assets repo will be copied into the 'artifacts' folder which is .gitignored.  In this way, the assets for the game you are building can remain separate from the assets of the editor itself.
 
-See 'example_game_assets' for an example of how this private repo should be set up.  Typically, it contains doodad_manifest files and all models for those doodads for your game.  For example, the doodad manifest would specify "tree_1" as a doodad type and then you would have a model "tree_1.glb" in the models folder.  When the editor boots, all of that gets copied to /artifacts/game_assets automatically and all of that data is used to build the "doodads pane".  
+See '/examples/bevy/example_game_assets' for an example of how this private repo should be set up.  Typically, it contains doodad_manifest files and all models for those doodads for your game.  For example, the doodad manifest would specify "tree_1" as a doodad type and then you would have a model "tree_1.glb" in the models folder.  When the editor boots, all of that gets copied to /artifacts/game_assets automatically and all of that data is used to build the "doodads pane".  
 
 ## Tool Modes
 

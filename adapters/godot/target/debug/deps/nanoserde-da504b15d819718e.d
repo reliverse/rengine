@@ -1,0 +1,11 @@
+/home/blefnk/B/R/reliverse/rengine/adapters/godot/target/debug/deps/nanoserde-da504b15d819718e.d: /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/lib.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_bin.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_ron.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_json.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/toml.rs
+
+/home/blefnk/B/R/reliverse/rengine/adapters/godot/target/debug/deps/libnanoserde-da504b15d819718e.rlib: /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/lib.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_bin.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_ron.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_json.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/toml.rs
+
+/home/blefnk/B/R/reliverse/rengine/adapters/godot/target/debug/deps/libnanoserde-da504b15d819718e.rmeta: /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/lib.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_bin.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_ron.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_json.rs /home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/toml.rs
+
+/home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/lib.rs:
+/home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_bin.rs:
+/home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_ron.rs:
+/home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/serde_json.rs:
+/home/blefnk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nanoserde-0.2.1/src/toml.rs:
