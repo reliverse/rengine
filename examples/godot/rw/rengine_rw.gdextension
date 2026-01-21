@@ -12,6 +12,3 @@ macos.debug = "res://librengine_godot_rw.dylib"
 macos.release = "res://librengine_godot_rw.dylib"
 macos.debug.arm64 = "res://librengine_godot_rw.dylib"
 macos.release.arm64 = "res://librengine_godot_rw.dylib"
-
-[icons]
-RwEditorPlugin = "res://icon.svg"

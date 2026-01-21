@@ -1,5 +1,5 @@
 /**
- * TXD Texture Archive Types for RenderWare Modding Suite Integration
+ * TXD Texture Archive Types for Rengine Integration
  * Based on RenderWare TXD (Texture Dictionary) format
  */
 

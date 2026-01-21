@@ -14,7 +14,3 @@ config/name="Rengine RW Demo"
 run/main_scene="res://rw_demo.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
-
-[editor_plugins]
-
-enabled=PackedStringArray("res://addons/rengine_rw/plugin.cfg")

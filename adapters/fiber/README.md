@@ -245,7 +245,7 @@ Features include automatic scaling, positioning, and progress tracking during im
 **Required Software:**
 
 - Node.js 22.0+
-- Bun 1.3.5+ (recommended package manager)
+- Bun 1.3.6+ (recommended package manager)
 - Rust 1.92.0+
 - Git 2.30+
 

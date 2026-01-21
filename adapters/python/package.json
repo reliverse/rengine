@@ -1,0 +1,82 @@
+{
+  "name": "@rengine/python-adapters",
+  "version": "1.0.0",
+  "description": "Python adapters for Rengine - Qt GUI, Blender addon, and CLI tools",
+  "private": true,
+  "scripts": {
+    "install:all": "bun app-qt:install && bun blender:install && bun app-cli:install",
+    "build:all": "bun app-qt:build && bun blender:build",
+    "test:all": "bun app-qt:test && bun blender:test && bun app-cli:test",
+    "check:all": "bun app-qt:check && bun blender:check",
+    "clean:all": "bun app-qt:clean && bun blender:clean && bun app-cli:clean",
+
+    "app-qt:install": "cd app-qt && pip3 install -r requirements.txt",
+    "app-qt:run": "cd app-qt && python3 -m application.main",
+    "app-qt:run:x11": "cd app-qt && bash run_app.sh",
+    "app-qt:run:wayland": "cd app-qt && bash run_app_wayland.sh",
+    "app-qt:run:auto": "cd app-qt && bash run_app_auto.sh",
+    "app-qt:build": "cd app-qt && python3 build.py",
+    "app-qt:test": "cd app-qt && python3 -m pytest tests/ -v",
+    "app-qt:check": "cd app-qt && python3 -m py_compile application/**/*.py && python3 -c \"import application.main; print('✓ Import check passed')\"",
+    "app-qt:diagnose": "cd app-qt && bash diagnose_system.sh",
+    "app-qt:setup:linux": "cd app-qt && cat LINUX_SETUP.md",
+    "app-qt:clean": "cd app-qt && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && find . -name '*.pyc' -delete",
+
+    "blender:install": "cd blender && pip3 install -r requirements.txt 2>/dev/null || echo 'No requirements.txt found, using existing DragonFF'",
+    "blender:build": "cd blender && python3 build.py",
+    "blender:test": "cd blender && python3 -m pytest tests/ -v",
+    "blender:check": "cd blender && python3 -c \"import gtaLib.dff; import gtaLib.img; print('✓ DragonFF import check passed')\"",
+    "blender:install:addon": "cd blender && echo 'To install as Blender addon: Edit > Preferences > Add-ons > Install from File > select dragonff.zip'",
+    "blender:clean": "cd blender && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && find . -name '*.pyc' -delete",
+
+    "app-cli:install": "cd app-cli && pip3 install -r requirements.txt 2>/dev/null || echo 'CLI has no external dependencies'",
+    "app-cli:run": "cd app-cli && python3 cli.py",
+    "app-cli:run:script": "cd app-cli && python3 run_cli.py",
+    "app-cli:test": "cd app-cli && python3 -c \"import cli; print('✓ CLI import check passed')\"",
+    "app-cli:check": "cd app-cli && python3 -c \"import cli; from cli import RengineCLI; print('✓ CLI functionality check passed')\"",
+    "app-cli:help": "cd app-cli && python3 cli.py --help",
+    "app-cli:clean": "cd app-cli && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && find . -name '*.pyc' -delete",
+
+    "deps:check": "echo 'Checking Python dependencies...' && python3 --version && pip3 --version",
+    "deps:upgrade": "echo 'Upgrading pip...' && pip3 install --upgrade pip",
+
+    "dev:setup": "bun deps:upgrade && bun install:all",
+    "dev:test": "bun test:all",
+    "dev:check": "bun check:all",
+
+    "gta:test:img": "cd app-cli && python3 cli.py img info /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/custom.img",
+    "gta:test:dff": "cd app-cli && find /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa -name '*.dff' -size -100k | head -1 | xargs python3 cli.py dff info",
+    "gta:test:batch": "cd app-cli && python3 cli.py batch analyze /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa --format dff --max-files 5",
+
+    "docker:build": "echo 'Building Python environment...' && docker build -t rengine-python .",
+    "docker:run": "docker run -it --rm -v $(pwd):/app rengine-python"
+  },
+  "keywords": [
+    "gta",
+    "modding",
+    "renderware",
+    "blender",
+    "qt",
+    "python",
+    "cli"
+  ],
+  "author": "Rengine Team",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/reliverse/rengine",
+    "directory": "adapters/python"
+  },
+  "bugs": {
+    "url": "https://github.com/reliverse/rengine/issues"
+  },
+  "homepage": "https://github.com/reliverse/rengine#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "workspaces": [
+    "app-qt",
+    "blender",
+    "app-cli"
+  ]
+}

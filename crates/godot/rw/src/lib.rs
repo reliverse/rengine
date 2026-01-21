@@ -144,22 +144,9 @@ impl INode for RwAnalyzer {
     }
 }
 
-
 use godot::init::{ExtensionLibrary};
 
 struct RwExtension;
 
 #[gdextension]
-unsafe impl ExtensionLibrary for RwExtension {
-    fn on_level_init(level: godot::init::InitLevel) {
-        if level == godot::init::InitLevel::Scene {
-            godot_print!("Rengine RW GDExtension initialized");
-        }
-    }
-
-    fn on_level_deinit(level: godot::init::InitLevel) {
-        if level == godot::init::InitLevel::Scene {
-            godot_print!("Rengine RW GDExtension deinitialized");
-        }
-    }
-}
+unsafe impl ExtensionLibrary for RwExtension {}

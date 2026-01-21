@@ -1,5 +1,5 @@
 /**
- * IMG Archive Types for RenderWare Modding Suite Integration
+ * IMG Archive Types for Rengine Integration
  * Based on GTA IMG archive format (v1 and v2)
  */
 

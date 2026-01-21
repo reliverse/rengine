@@ -1,15 +1,123 @@
 ---
 alwaysApply: true
 ---
-# General Rules
 
-- Use absolute paths when interacting with bash tools.
+# Rengine Project Rules
 
-## About Project
+**Use absolute paths with bash tools.**
 
-Rengine is a modern 3D and 2D game engine.
+## About
 
-There is two editions:
+Rengine is a modern 3D/2D game engine with 5 editions:
+- **Bevy** (`./`) - Rust + egui + Bevy 0.18. Experimental level editor.
+- **Fiber** (`./adapters/fiber`) - Tauri 2.0 + React + Three.js. Stable scene editor.
+- **Godot** (`./adapters/godot`) - Godot 4.5.1 + Rust. Experimental.
+- **Qt** (`./adapters/python/app-qt`) - Python + Qt desktop app.
+- **Blender** (`./adapters/python/blender`) - Blender extension.
 
-- `./` - egui + Bevy 0.18 + etc. More experimental.
-- `./adapters/fiber` - Tauri 2.0 + React + Three.js + etc. More stable.
+## Commands by Edition
+
+### Root (Monorepo)
+```bash
+bun install          # Install deps
+bun check           # Format, lint, typecheck all
+bun clean           # Clean builds
+```
+
+### Bevy Edition
+```bash
+cargo run                                              # Dev mode
+cargo build --release                                  # Production
+cargo build --release --target x86_64-pc-windows-gnu  # Windows build
+cargo run --bin upgrade_zone_files                     # Utilities
+```
+
+### Fiber Edition
+```bash
+cd adapters/fiber
+bun start           # Dev with Tauri
+bun dev             # Frontend only
+bun app:build       # Full build
+bun tests           # Vitest tests
+bun check           # Quality checks
+```
+
+### Qt Edition
+```bash
+cd adapters/python/app-qt
+pip install -r requirements.txt
+python main.py
+pyinstaller --onefile main.py  # Build executable
+```
+
+### Blender Edition
+```bash
+cd adapters/python/blender
+# Install via Blender: Edit > Preferences > Add-ons > Install
+```
+
+## Key Architecture
+
+### Bevy Edition
+- **Plugin-based ECS**: Terrain, doodads, foliage, regions in `src/`
+- **Config**: `.ron` files in `assets/` (editor_config, manifests)
+- **External assets**: Copied to `./artifacts/` (gitignored)
+- **Saving**: Right-click zone entities in hierarchy (only persistence method)
+- **Crates**: Local plugins in `crates/bevy/`
+
+### Fiber Edition
+- **Frontend**: React 19 + TanStack Router + R3F (Three.js) + Zustand + Shadcn/ui + Tailwind 4
+- **Backend**: Tauri 2 (Rust) for file system
+- **State**: Zustand stores with selector optimization
+
+### Python Editions
+- **Qt**: PySide6 MVC pattern, signal-slot system
+- **Blender**: Standard addon architecture, operator/panel system
+
+## Code Quality
+
+### TypeScript (Fiber)
+- **Biome** for lint/format (extends `ultracite` presets)
+- Double quotes, 2-space indent
+- Functional React with hooks, strict TypeScript
+
+### Rust (Bevy/Godot)
+- `rustfmt` + `clippy`, Edition 2024
+- Bevy ECS patterns, Result/Option types
+
+### Python (Qt/Blender)
+- **PEP 8**, type hints, Google/NumPy docstrings
+- Qt: proper signal/slot, avoid memory leaks
+- Blender: bpy.context awareness, operator registration
+
+## Important Notes
+
+### Bevy First-Time Setup
+1. Set `initial_level_to_load` to `default_level.level` in `assets/editor_config.editorconfig.ron`
+2. Set `external_game_assets_folder` to `None` for standalone
+3. `cargo run` - loads sample level with cube
+
+### Bevy Hotkeys
+- **F1**: Toggle physics collider rendering
+- **ESC**: Toggle doodad placement mode
+
+### External Dependencies Source
+- `opensrc/` contains dependency source code
+- Fetch: `npx opensrc <package>` (npm), `npx opensrc pypi:<package>`, `npx opensrc crates:<package>`
+
+### Gitignored
+- `./artifacts/` - External game assets
+- `./target/` - Rust builds
+- Standard build outputs
+
+### Testing
+- **Bevy**: Primarily manual testing through editor
+- **Fiber**: `bun tests` (Vitest)
+- **Python**: unittest/pytest, Qt: QTest, Blender: bpy.ops
+
+## Troubleshooting
+
+**Bevy**: Check `.ron` config files if levels fail to load
+**Fiber**: Run `bun check` for quality issues
+**Qt**: Ensure PySide6 and system Qt libs installed
+**Blender**: Check version compatibility and addon enabled

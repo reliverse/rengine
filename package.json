@@ -2,9 +2,11 @@
   "name": "rengine",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.3.5",
+  "packageManager": "bun@1.3.6",
   "scripts": {
+    "qt": "cd adapters/python/app-qt && ./run_app.sh",
     "gd": "godot4 ./examples/godot/rw/project.godot",
+    "gd:build": "cd examples/godot/rw && ./build_and_copy.sh",
     "pub": "bun run build && bun dler publish",
     "latest": "bun dler update && bun check",
     "build": "bun clean:build && bun check && bun dler build --loggerClearInternals",
@@ -24,7 +26,10 @@
     "lint": "biome lint --fix --unsafe",
     "format": "biome format --fix",
     "unused": "bun dler unused --ignore @reliverse/dler",
-    "check": "bun dler tsc && bun format && bun lint"
+    "check": "bun dler tsc && bun format && bun lint",
+    "test:blender": "cd adapters/python/blender && python3 tests/test_*.py",
+    "test:app-qt": "cd adapters/python/app-qt && python3 tests/test_*.py",
+    "test:python": "bun test:blender && bun test:app-qt"
   },
   "workspaces": {
     "packages": [

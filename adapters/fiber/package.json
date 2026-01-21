@@ -3,7 +3,6 @@
   "private": true,
   "version": "0.3.0",
   "type": "module",
-  "packageManager": "bun@1.3.5",
   "scripts": {
     "start": "bun --bun run tauri dev",
     "pub": "bun release.ts --target exe --bump minor",
