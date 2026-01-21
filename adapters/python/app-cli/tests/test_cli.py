@@ -21,14 +21,19 @@ class TestRengineCLI(unittest.TestCase):
     @patch('sys.exit')
     def test_run_help(self, mock_exit, mock_factory_class, mock_parser_class):
         """Test CLI run with help command"""
-        # Mock parser
+        # Mock parser instance
         mock_parser = Mock()
-        mock_parser_class.return_value.create_parser.return_value.parse_args.return_value = Mock(command=None)
+        mock_arg_parser = Mock()
+        mock_arg_parser.parse_args.return_value = Mock(command=None)
+        mock_parser.create_parser.return_value = mock_arg_parser
         mock_parser_class.return_value = mock_parser
 
         # Mock factory
         mock_factory = Mock()
         mock_factory_class.return_value = mock_factory
+
+        # Replace the CLI's parser with our mock
+        self.cli.parser = mock_parser
 
         # Run CLI
         self.cli.run()
@@ -42,13 +47,15 @@ class TestRengineCLI(unittest.TestCase):
     @patch('sys.exit')
     def test_run_command(self, mock_exit, mock_factory_class, mock_parser_class):
         """Test CLI run with actual command"""
-        # Mock parser
+        # Mock parser instance
         mock_parser = Mock()
         args = Mock()
         args.command = 'img'
         args.img_command = 'info'
         args.verbose = False
-        mock_parser.create_parser.return_value.parse_args.return_value = args
+        mock_arg_parser = Mock()
+        mock_arg_parser.parse_args.return_value = args
+        mock_parser.create_parser.return_value = mock_arg_parser
         mock_parser_class.return_value = mock_parser
 
         # Mock factory
@@ -56,6 +63,10 @@ class TestRengineCLI(unittest.TestCase):
         mock_factory.get_command_name.return_value = 'img-info'
         mock_factory.execute_command.return_value = 0
         mock_factory_class.return_value = mock_factory
+
+        # Replace the CLI's parser and factory with our mocks
+        self.cli.parser = mock_parser
+        self.cli.factory = mock_factory
 
         # Run CLI
         self.cli.run()
@@ -70,13 +81,15 @@ class TestRengineCLI(unittest.TestCase):
     @patch('sys.exit')
     def test_run_command_error(self, mock_exit, mock_factory_class, mock_parser_class):
         """Test CLI run with command error"""
-        # Mock parser
+        # Mock parser instance
         mock_parser = Mock()
         args = Mock()
         args.command = 'img'
         args.img_command = 'info'
         args.verbose = False
-        mock_parser.create_parser.return_value.parse_args.return_value = args
+        mock_arg_parser = Mock()
+        mock_arg_parser.parse_args.return_value = args
+        mock_parser.create_parser.return_value = mock_arg_parser
         mock_parser_class.return_value = mock_parser
 
         # Mock factory
@@ -84,6 +97,10 @@ class TestRengineCLI(unittest.TestCase):
         mock_factory.get_command_name.return_value = 'img-info'
         mock_factory.execute_command.side_effect = Exception("Test error")
         mock_factory_class.return_value = mock_factory
+
+        # Replace the CLI's parser and factory with our mocks
+        self.cli.parser = mock_parser
+        self.cli.factory = mock_factory
 
         # Run CLI
         self.cli.run()

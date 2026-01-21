@@ -4,6 +4,7 @@ Main CLI class
 
 import sys
 import logging
+from typing import Optional
 
 from .parser import CommandParser
 from .factory import CommandFactory
@@ -14,9 +15,9 @@ class RengineCLI:
     """Main CLI class"""
 
     def __init__(self):
-        self.logger = None
+        self.logger: Optional[logging.Logger] = None
         self.parser = CommandParser()
-        self.factory = None
+        self.factory: Optional[CommandFactory] = None
         self.deps = DependencyManager()
 
     def setup_logging(self):
@@ -35,6 +36,10 @@ class RengineCLI:
         """Main entry point"""
         self.setup_logging()
 
+        # Ensure logging and factory are initialized
+        assert self.logger is not None
+        assert self.factory is not None
+
         arg_parser = self.parser.create_parser()
         args = arg_parser.parse_args()
 
@@ -52,6 +57,7 @@ class RengineCLI:
 
         # Execute the command
         try:
+            assert command_name is not None  # Type checker hint
             exit_code = self.factory.execute_command(command_name, args)
             sys.exit(exit_code)
         except Exception as e:

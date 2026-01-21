@@ -3,7 +3,7 @@ Command factory for creating CLI commands
 """
 
 import logging
-from typing import Dict, Type, Any
+from typing import Dict, Type, Any, Optional
 
 from .base import BaseCommand
 from .commands import (
@@ -70,7 +70,7 @@ class CommandFactory:
 
         return command_class(self.logger)
 
-    def get_command_name(self, args) -> str:
+    def get_command_name(self, args) -> Optional[str]:
         """Extract command name from parsed arguments"""
         if not args.command:
             return None

@@ -180,15 +180,15 @@ class Sections:
     library_id = 0 # used for writing
     
     #######################################################
-    def read(type, data, offset=0):
+    def read(type_cls, data, offset=0):
 
         # These are simple non-nested data types that can be returned in a single
         # unpack calls, and thus do not need any special functions
-        if type in Sections.formats:
-            unpacker = Sections.formats[type]
-            return type._make(unpack_from(unpacker,data,offset))
+        if type_cls in Sections.formats:
+            unpacker = Sections.formats[type_cls]
+            return type_cls._make(unpack_from(unpacker,data,offset))
 
-        elif type is Matrix:
+        elif type_cls is Matrix:
             return Matrix._make(
                 (
                     Sections.read(Vector, data, offset),
@@ -197,24 +197,24 @@ class Sections:
                 )
             )
 
-        elif type is UVFrame:
+        elif type_cls is UVFrame:
             return UVFrame(
                 unpack_from("<f", data, offset)[0], #Time
                 list(unpack_from("<6f", data, offset + 4)), #UV
                 unpack_from("<i", data, offset + 28)[0] #Prev
             )
         else:
-            raise NotImplementedError("unknown type", type)
+            raise NotImplementedError("unknown type", type_cls)
 
     #######################################################
-    def pad_string(str):
+    def pad_string(string):
 
-        str_len = len(str)
+        str_len = len(string)
         str_len += 1
 
         # pad to next power of 4 if current number is not divisible by 4
         str_len = (str_len // 4 + (0 if str_len % 4 == 0 else 1)) * 4
-        return pack("%ds" % str_len, str.encode('utf8'))
+        return pack("%ds" % str_len, string.encode('utf8'))
         
     #######################################################
     def write(type, data, chunk_type=None):
@@ -258,7 +258,7 @@ class Sections:
     #######################################################
     def get_library_id(version, build):
         #see https://gtamods.com/wiki/RenderWare
-        
+
         if version <= 0x31000:
             return version >> 8
 

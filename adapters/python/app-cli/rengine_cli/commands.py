@@ -5,13 +5,13 @@ CLI command implementations
 import os
 import glob
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, cast
 import logging
 
 from .base import BaseCommand, OutputFormatter, DependencyManager
 from .handlers import (
     IMGHandler, DFFHandler, TXDHandler, COLHandler, IPLHandler, RWHandler,
-    DFFConverterHandler, TXDConverterHandler, IPLToGodotHandler
+    DFFConverterHandler, TXDConverterHandler
 )
 
 
@@ -70,7 +70,7 @@ class IMGListCommand(BaseCommand):
                 print(f"Files in {result['file']} ({len(result['entries'])} entries):")
                 print("-" * 60)
                 for entry in sorted(result['entries'], key=lambda x: x['name']):
-                    print("12")
+                    print(f"  {entry['name']:<50} {entry['size']:>10,} bytes")
 
             return 0
         except Exception as e:
@@ -155,12 +155,19 @@ class DFFAnalyzeCommand(BaseCommand):
                 print(f"DFF Analysis: {args.file}")
                 print(f"Size: {analysis['size']:,} bytes")
                 print(f"Chunks: {len(analysis['chunks'])}")
-                print("\nChunk Structure:")
-                for chunk in analysis['chunks'][:20]:  # Show first 20 chunks
-                    print("12")
 
-                if len(analysis['chunks']) > 20:
-                    print(f"... and {len(analysis['chunks']) - 20} more chunks")
+                def print_chunks(chunks, indent=0):
+                    prefix = "  " * indent
+                    for i, chunk in enumerate(chunks):
+                        if i >= 20 and indent == 0:  # Limit top level chunks
+                            print(f"{prefix}... and {len(chunks) - 20} more chunks")
+                            break
+                        print(f"{prefix}{chunk['type_name']} ({chunk['type']}) - {chunk['size']} bytes - {chunk['version_name']}")
+                        if 'children' in chunk and chunk['children']:
+                            print_chunks(chunk['children'], indent + 1)
+
+                print("\nChunk Structure:")
+                print_chunks(analysis['chunks'])
 
             return 0
         except Exception as e:
@@ -416,7 +423,7 @@ class BatchAnalyzeCommand(BaseCommand):
         if args.max_files:
             files = files[:args.max_files]
 
-        results = {
+        results: Dict[str, Any] = {
             'directory': args.directory,
             'format': args.format,
             'recursive': args.recursive,
@@ -436,7 +443,7 @@ class BatchAnalyzeCommand(BaseCommand):
                 }
 
                 # Get basic info based on file type
-                ext = file_info['type'].lower()
+                ext = str(file_info['type']).lower()
                 if ext == 'dff':
                     handler = DFFHandler(self.logger)
                     file_info.update(handler.get_info(file_path, deps))
@@ -453,13 +460,13 @@ class BatchAnalyzeCommand(BaseCommand):
                     handler = IMGHandler(self.logger, deps)
                     file_info.update(handler.get_info(file_path))
 
-                results['analyzed_files'].append(file_info)
+                cast(List[Dict[str, Any]], results['analyzed_files']).append(file_info)
 
                 if not getattr(args, 'quiet', False):
                     print(f"Analyzed: {file_path}")
 
             except Exception as e:
-                results['errors'].append({
+                cast(List[Dict[str, Any]], results['errors']).append({
                     'file': file_path,
                     'error': str(e)
                 })
@@ -593,8 +600,9 @@ class IPLToGodotCommand(BaseCommand):
 
     def execute(self, args) -> int:
         try:
-            import os
-            handler = IPLToGodotHandler(self.logger)
+            from .modules.ipl_to_godot import IPLToGodotConverter
+
+            converter = IPLToGodotConverter(self.logger)
 
             input_path = args.input
             output_path = args.output
@@ -602,7 +610,7 @@ class IPLToGodotCommand(BaseCommand):
 
             if os.path.isdir(input_path):
                 # Convert directory to full Godot project
-                result = handler.convert_directory_to_godot_project(
+                result = converter.convert_directory_to_godot_project(
                     input_path, output_path, project_name, args.template
                 )
 
@@ -614,7 +622,7 @@ class IPLToGodotCommand(BaseCommand):
 
             else:
                 # Convert single file to scene
-                result = handler.convert_to_godot(input_path, output_path, args.template)
+                result = converter.convert_to_godot(input_path, output_path, args.template)
 
                 if not getattr(args, 'quiet', False):
                     print(f"Converted {input_path} to Godot scene: {output_path}")

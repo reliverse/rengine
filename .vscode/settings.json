@@ -81,5 +81,17 @@
   "[mdx]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "godotTools.editorPath.godot4": "/home/blefnk/B/A/godot/godot4"
+  "godotTools.editorPath.godot4": "/home/blefnk/B/A/godot/godot4",
+  // Python settings
+  "python.defaultInterpreterPath": "python3",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "ruff.enable": true,
+  "ruff.organizeImports": true,
+  "ruff.fixAll": true
 }

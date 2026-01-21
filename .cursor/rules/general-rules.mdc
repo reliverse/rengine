@@ -103,7 +103,7 @@ cd adapters/python/blender
 
 ### External Dependencies Source
 - `opensrc/` contains dependency source code
-- Fetch: `npx opensrc <package>` (npm), `npx opensrc pypi:<package>`, `npx opensrc crates:<package>`
+- Fetch: `bunx opensrc <package>` (npm), `bunx opensrc pypi:<package>`, `bunx opensrc crates:<package>`
 
 ### Gitignored
 - `./artifacts/` - External game assets
@@ -114,6 +114,13 @@ cd adapters/python/blender
 - **Bevy**: Primarily manual testing through editor
 - **Fiber**: `bun tests` (Vitest)
 - **Python**: unittest/pytest, Qt: QTest, Blender: bpy.ops
+- We have img, dff, txd, col, ifp, ipl files in /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa dir (it has 18k+ files, so use bash commands to limit file searching when you will learn this dir). You can use these files to test the rust/python code with these files where applicable.
+
+### Python
+- Use `uv` for Python package management.
+- Use `ruff` for linting and formatting.
+- Use `ty` for type checking.
+- Use `pytest` for testing.
 
 ## Troubleshooting
 

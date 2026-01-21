@@ -29,7 +29,8 @@
     "check": "bun dler tsc && bun format && bun lint",
     "test:blender": "cd adapters/python/blender && python3 tests/test_*.py",
     "test:app-qt": "cd adapters/python/app-qt && python3 tests/test_*.py",
-    "test:python": "bun test:blender && bun test:app-qt"
+    "test:python": "bun test:blender && bun test:app-qt",
+    "ty:cli": "cd adapters/python/app-cli && uv run ty check --output-format concise | head -20"
   },
   "workspaces": {
     "packages": [

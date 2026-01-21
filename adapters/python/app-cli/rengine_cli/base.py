@@ -253,11 +253,11 @@ class DependencyManager:
     """Manages optional dependencies and their availability"""
 
     def __init__(self):
-        self._qt_app_available = None
-        self._blender_img_available = None
-        self._blender_col_available = None
-        self._blender_map_available = None
-        self._blender_available = None
+        self._qt_app_available: bool = False
+        self._blender_img_available: bool = False
+        self._blender_col_available: bool = False
+        self._blender_map_available: bool = False
+        self._blender_available: bool = False
         self._rw_manager = None
         self._detect_rw_file_format = None
 
