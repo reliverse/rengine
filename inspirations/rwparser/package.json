@@ -1,0 +1,47 @@
+{
+  "name": "rw-parser",
+  "version": "2.0.0",
+  "description": "Parses RenderWare DFF and TXD files into usable format!",
+  "author": "Timic3 & Megadreams",
+  "license": "GPL-3.0",
+  "homepage": "https://github.com/Timic3/rw-parser#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Timic3/rw-parser.git"
+  },
+  "keywords": [
+    "gta",
+    "gtasa",
+    "gtavc",
+    "gtaiii",
+    "san andreas",
+    "vice city",
+    "iii",
+    "renderware",
+    "parser",
+    "rw-parser"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.0.10",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "prepare": "npm run build",
+    "test": "jest"
+  },
+  "files": [
+    "lib",
+    "src",
+    "LICENSE",
+    "README.md",
+    "package.json",
+    "tsconfig.json"
+  ]
+}

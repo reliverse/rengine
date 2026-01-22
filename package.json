@@ -43,6 +43,6 @@
     "@biomejs/biome": "^2.3.11",
     "@reliverse/dler": "^2.3.4",
     "turbo": "^2.7.5",
-    "ultracite": "^7.0.11"
+    "ultracite": "^7.0.12"
   }
 }

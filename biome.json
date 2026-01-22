@@ -19,7 +19,9 @@
       "!**/gen/**/*",
       "!**/tmp/**/*",
       "!**/temp/**/*",
-      "!**/crates/**/*"
+      "!**/crates/**/*",
+      "!**/.venv/**/*",
+      "!**/inspirations/**/*"
     ]
   },
   "formatter": {

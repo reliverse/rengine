@@ -2,9 +2,9 @@
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2022"],
     "module": "ESNext",
-    "types": ["@types/bun", "vite/client"],
+    "types": ["@types/bun"],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -13,7 +13,6 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "jsx": "react-jsx",
 
     /* Linting */
     "strict": true,
@@ -29,5 +28,5 @@
       "~/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "release.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

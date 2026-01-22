@@ -1,0 +1,47 @@
+name: Publish Node.js Package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'adapters/bun/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd adapters/bun && bun install
+
+      - name: Run tests
+        run: cd adapters/bun && bun run test
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd adapters/bun && bun install
+
+      - name: Publish to NPM
+        run: cd adapters/bun && bun publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} 
