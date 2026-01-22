@@ -114,7 +114,7 @@ cd adapters/python/blender
 - **Bevy**: Primarily manual testing through editor
 - **Fiber**: `bun tests` (Vitest)
 - **Python**: unittest/pytest, Qt: QTest, Blender: bpy.ops
-- We have img, dff, txd, col, ifp, ipl files in /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa dir (it has 18k+ files, so use bash commands to limit file searching when you will learn this dir). You can use these files to test the rust/python code with these files where applicable.
+- We have img, dff, ide, txd, col, ifp, ipl files in /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa dir (it has 18k+ files, so use bash commands to limit file searching when you will learn this dir). You can use these files to test the rust/python code with these files where applicable.
 
 ### Python
 - Use `uv` for Python package management.
@@ -128,3 +128,5 @@ cd adapters/python/blender
 **Fiber**: Run `bun check` for quality issues
 **Qt**: Ensure PySide6 and system Qt libs installed
 **Blender**: Check version compatibility and addon enabled
+
+Important: Use hex analysis tool for hard problems, so you can understand different file formats and their structures in more detailed way.

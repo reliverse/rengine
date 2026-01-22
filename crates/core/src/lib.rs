@@ -36,6 +36,15 @@ pub enum RengineError {
     UnsupportedImageFormat { format: String },
 }
 
+impl From<std::io::Error> for RengineError {
+    fn from(error: std::io::Error) -> Self {
+        RengineError::FileWriteFailed {
+            path: "unknown".to_string(),
+            details: error.to_string(),
+        }
+    }
+}
+
 
 pub mod renderware;
 

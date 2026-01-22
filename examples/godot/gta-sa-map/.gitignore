@@ -1,0 +1,17 @@
+# Godot-specific ignores
+.import/
+*.import
+
+# Imported binaries
+*.so
+*.dll
+*.dylib
+
+# Build artifacts
+target/
+Cargo.lock
+
+# Temporary files
+*.tmp
+*.swp
+*.bak

@@ -1,3 +1,5 @@
+dist
+build
 target
  
 artifacts/**
@@ -21,3 +23,8 @@ cargo-check-errors.txt
 *.so
 *.rlib
 *.rmeta
+.godot
+scenes
+inspirations/magictxd/vendor
+inspirations/magictxd/languages
+inspirations/magictxd/resources

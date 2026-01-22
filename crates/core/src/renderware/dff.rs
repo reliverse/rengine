@@ -319,19 +319,63 @@ pub struct DffModel {
 }
 
 impl DffModel {
+    /// Quickly check if a file appears to be a valid DFF file by reading the header
+    pub fn is_valid_dff_file(path: &str) -> Result<bool, DffError> {
+        // Basic file validation before attempting to load
+        let metadata = std::fs::metadata(path)?;
+        if metadata.len() < 12 {
+            // Minimum size for a CLUMP header (type + size + version = 12 bytes)
+            return Ok(false);
+        }
+
+        let mut file = std::fs::File::open(path)?;
+        let (section_type, _, _) = Self::read_section_header(&mut file)?;
+
+        // Check if it starts with a CLUMP section (0x0010)
+        Ok(section_type == 0x0010)
+    }
+
     pub fn load_from_path(path: &str) -> Result<Self, DffError> {
+        // Basic file validation before attempting to load
+        let metadata = std::fs::metadata(path)?;
+        if metadata.len() < 12 {
+            // Minimum size for a CLUMP header (type + size + version = 12 bytes)
+            return Err(DffError::InvalidFormat(
+                format!("File too small to be a valid DFF ({} bytes, minimum 12 bytes)", metadata.len())
+            ));
+        }
+
         let mut file = std::fs::File::open(path)?;
         Self::load_from_reader(&mut file, path)
     }
 
     pub fn load_from_reader<R: Read + Seek>(reader: &mut R, path: &str) -> Result<Self, DffError> {
         // Read the main CLUMP section header
-        let (section_type, _section_size, rw_version) = Self::read_section_header(reader)?;
+        let (section_type, _section_size, rw_version) = match Self::read_section_header(reader) {
+            Ok(header) => header,
+            Err(DffError::Io(e)) => {
+                match e.kind() {
+                    std::io::ErrorKind::UnexpectedEof => {
+                        return Err(DffError::InvalidFormat(
+                            format!("File appears to be truncated or corrupted (unable to read header from {})", path)
+                        ));
+                    }
+                    _ => {
+                        return Err(DffError::InvalidFormat(
+                            format!("IO error while reading DFF header from {}: {}", path, e)
+                        ));
+                    }
+                }
+            }
+            Err(e) => return Err(e),
+        };
 
         if section_type != 0x0010 {
             // CLUMP
+            let section_name = Self::get_section_name(section_type);
             return Err(DffError::InvalidFormat(
-                "Expected CLUMP section".to_string(),
+                format!("Invalid DFF format: Expected CLUMP section (0x0010), found {} (0x{:04X}). This appears to be a {} file, not a DFF model file: {}",
+                    section_name, section_type, section_name, path),
             ));
         }
 
@@ -344,19 +388,61 @@ impl DffModel {
         let _num_cameras = Self::read_u32(reader)?;
 
         // Skip to frame list
-        Self::skip_to_section(reader, 0x000E)?; // FRAME_LIST
+        match Self::skip_to_section(reader, 0x000E) { // FRAME_LIST
+            Ok(_) => {}
+            Err(DffError::InvalidFormat(msg)) if msg.contains("not found") => {
+                return Err(DffError::InvalidFormat(format!(
+                    "FRAME_LIST section not found in DFF file: {}. File may be corrupted or truncated.", msg
+                )));
+            }
+            Err(e) => return Err(e),
+        }
 
-        let frames = Self::read_frame_list(reader)?;
+        let frames = match Self::read_frame_list(reader) {
+            Ok(frames) => frames,
+            Err(e) => {
+                return Err(DffError::InvalidFormat(format!(
+                    "Failed to read frame list: {}. File may be corrupted.", e
+                )));
+            }
+        };
 
         // Skip to geometry list
-        Self::skip_to_section(reader, 0x001A)?; // GEOMETRY_LIST
+        match Self::skip_to_section(reader, 0x001A) { // GEOMETRY_LIST
+            Ok(_) => {}
+            Err(DffError::InvalidFormat(msg)) if msg.contains("not found") => {
+                return Err(DffError::InvalidFormat(format!(
+                    "GEOMETRY_LIST section not found in DFF file: {}. File may be corrupted or truncated.", msg
+                )));
+            }
+            Err(e) => return Err(e),
+        }
 
-        let geometries = Self::read_geometry_list(reader)?;
+        let geometries = match Self::read_geometry_list(reader) {
+            Ok(geometries) => geometries,
+            Err(e) => {
+                return Err(DffError::InvalidFormat(format!(
+                    "Failed to read geometry list: {}. File may be corrupted.", e
+                )));
+            }
+        };
 
-        // Skip to atomic list
-        Self::skip_to_section(reader, 0x0014)?; // ATOMIC_LIST
-
-        let atomics = Self::read_atomic_list(reader)?;
+        // Try to skip to atomic list (may not be present in corrupted files)
+        let atomics = match Self::skip_to_section(reader, 0x0014) { // ATOMIC_LIST
+            Ok(_) => {
+                match Self::read_atomic_list(reader) {
+                    Ok(atomics) => atomics,
+                    Err(_e) => {
+                        // If atomic list reading fails, continue with empty list
+                        Vec::new()
+                    }
+                }
+            }
+            Err(_) => {
+                // ATOMIC_LIST not found, continue with empty list
+                Vec::new()
+            }
+        };
 
         // Try to parse 2DFX effects from the last geometry's extensions
         let effects_2dfx = Self::extract_2dfx_effects(&geometries);
@@ -380,6 +466,32 @@ impl DffModel {
         let section_size = Self::read_u32(reader)?;
         let rw_version = Self::read_u32(reader)?;
         Ok((section_type, section_size, rw_version))
+    }
+
+    fn get_section_name(section_type: u32) -> &'static str {
+        match section_type {
+            0x0001 => "STRUCT",
+            0x0002 => "STRING",
+            0x0003 => "EXTENSION",
+            0x0006 => "TEXTURE",
+            0x0007 => "MATERIAL",
+            0x0008 => "MATERIAL_LIST",
+            0x000E => "FRAME_LIST",
+            0x000F => "GEOMETRY",
+            0x0010 => "CLUMP",
+            0x0014 => "ATOMIC",
+            0x0015 => "TEXTURE_NATIVE",
+            0x0016 => "TEXTURE_DICTIONARY",
+            0x001A => "GEOMETRY_LIST",
+            0x002B => "ANIMATION/UV_ANIMATION",
+            0x011F => "USER_DATA_PLG",
+            0x0120 => "MATERIAL_EFFECTS_PLG",
+            0x0139 => "UV_ANIMATION_PLG",
+            0x1803FFF7 => "SPECULAR_MATERIAL",
+            0x1803FFF8 => "REFLECTION_MATERIAL",
+            0x1803FFF9 => "2D_EFFECT",
+            _ => "UNKNOWN",
+        }
     }
 
     fn read_u32<R: Read>(reader: &mut R) -> Result<u32, DffError> {
@@ -524,10 +636,34 @@ impl DffModel {
 
         let num_geometries = Self::read_u32(reader)?;
 
+        // Check if num_geometries is reasonable
+        if num_geometries > 1000 {
+            return Err(DffError::InvalidFormat(format!(
+                "Unreasonable number of geometries: {}. File may be corrupted.", num_geometries
+            )));
+        }
+
         let mut geometries = Vec::new();
 
         for _i in 0..num_geometries {
-            geometries.push(Self::read_geometry(reader)?);
+            // Check if we have enough data for another geometry header
+            let current_pos = reader.stream_position()?;
+            let file_size = reader.seek(SeekFrom::End(0))?;
+            reader.seek(SeekFrom::Start(current_pos))?;
+
+            if current_pos + 12 > file_size {
+                // Not enough data for another geometry, stop here
+                break;
+            }
+
+            match Self::read_geometry(reader) {
+                Ok(geometry) => geometries.push(geometry),
+                Err(_e) => {
+                    // If we can't read this geometry, stop and return what we have
+                    // This handles truncated files gracefully
+                    break;
+                }
+            }
         }
 
         Ok(geometries)
@@ -632,29 +768,97 @@ impl DffModel {
             }
         }
 
-        // Now read the MATERIAL_LIST section
-        let (_matlist_type, _matlist_size, _matlist_version) = Self::read_section_header(reader)?;
-
-        // Read MATERIAL_LIST STRUCT
-        let (_ml_struct_type, _ml_struct_size, _ml_struct_version) =
-            Self::read_section_header(reader)?;
-
-        // Read materials count
-        let num_materials = Self::read_u32(reader)?;
-
-        // Skip material indices array (num_materials * 4 bytes)
-        for _i in 0..num_materials {
-            let _mat_idx = Self::read_u32(reader)?;
-        }
-
+        // Try to read the MATERIAL_LIST section (it may not be present)
         let mut materials = Vec::new();
-        for _i in 0..num_materials {
-            materials.push(Self::read_material(reader)?);
+        let current_pos = reader.stream_position()?;
+
+        // Check if we have enough data for a potential MATERIAL_LIST header
+        let file_size = reader.seek(SeekFrom::End(0))?;
+        reader.seek(SeekFrom::Start(current_pos))?;
+
+        if current_pos + 12 <= file_size {
+            // Try to read what might be a MATERIAL_LIST header
+            let (potential_type, potential_size, _potential_version) = Self::read_section_header(reader)?;
+
+            if potential_type == RW_SECTION_MATERIAL_LIST {
+                // We found a MATERIAL_LIST, read it
+                let matlist_end_pos = current_pos + 12 + potential_size as u64;
+                if matlist_end_pos > file_size {
+                    return Err(DffError::InvalidFormat(format!(
+                        "MATERIAL_LIST section size {} exceeds file bounds (would end at 0x{:X}, file size 0x{:X})",
+                        potential_size, matlist_end_pos, file_size
+                    )));
+                }
+
+                // Read MATERIAL_LIST STRUCT
+                let (_ml_struct_type, _ml_struct_size, _ml_struct_version) =
+                    Self::read_section_header(reader)?;
+
+                // Read materials count
+                let num_materials = Self::read_u32(reader)?;
+
+                // Check if num_materials is reasonable (prevent excessive memory allocation)
+                if num_materials > 1000 {
+                    return Err(DffError::InvalidFormat(format!(
+                        "Unreasonable number of materials: {}. File may be corrupted.", num_materials
+                    )));
+                }
+
+                // Skip material indices array (num_materials * 4 bytes)
+                for i in 0..num_materials {
+                    let current_pos = reader.stream_position()?;
+                    if current_pos + 4 > matlist_end_pos {
+                        return Err(DffError::InvalidFormat(format!(
+                            "Material index {} truncated - not enough data in MATERIAL_LIST section", i
+                        )));
+                    }
+                    let _mat_idx = Self::read_u32(reader)?;
+                }
+
+                for i in 0..num_materials {
+                    let current_pos = reader.stream_position()?;
+                    if current_pos >= matlist_end_pos {
+                        return Err(DffError::InvalidFormat(format!(
+                            "Material {} starts beyond MATERIAL_LIST section bounds (at 0x{:X}, section ends at 0x{:X})",
+                            i, current_pos, matlist_end_pos
+                        )));
+                    }
+                    match Self::read_material(reader) {
+                        Ok(material) => materials.push(material),
+                        Err(e) => {
+                            return Err(DffError::InvalidFormat(format!(
+                                "Failed to read material {}: {}. File may be corrupted.", i, e
+                            )));
+                        }
+                    }
+                }
+            } else {
+                // Not a MATERIAL_LIST, rewind to the previous position
+                reader.seek(SeekFrom::Start(current_pos))?;
+            }
         }
 
         // Check for native geometry
         let native_geometry = if is_native {
-            Some(Self::read_native_geometry(reader, flags)?)
+            // Check if we have enough data for native geometry header
+            let current_pos = reader.stream_position()?;
+            let file_size = reader.seek(SeekFrom::End(0))?;
+            reader.seek(SeekFrom::Start(current_pos))?;
+
+            if current_pos + 12 <= file_size {
+                // Try to read native geometry
+                match Self::read_native_geometry(reader, flags) {
+                    Ok(native) => Some(native),
+                    Err(_) => {
+                        // If native geometry reading fails, continue without it
+                        // Some files may have the native flag set but corrupted data
+                        reader.seek(SeekFrom::Start(current_pos))?; // Rewind
+                        None
+                    }
+                }
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -678,20 +882,59 @@ impl DffModel {
     }
 
     fn read_material<R: Read + Seek>(reader: &mut R) -> Result<Material, DffError> {
+        // Check if we can read the section header (12 bytes)
+        let current_pos = reader.stream_position()?;
+        let file_size = reader.seek(SeekFrom::End(0))?;
+        reader.seek(SeekFrom::Start(current_pos))?;
+
+        if current_pos + 12 > file_size {
+            return Err(DffError::InvalidFormat(
+                format!("Material section header truncated - need 12 bytes, only {} available", file_size - current_pos)
+            ));
+        }
+
         let (section_type, section_size, _rw_version) = Self::read_section_header(reader)?;
 
         if section_type != RW_SECTION_MATERIAL {
             return Err(DffError::InvalidFormat(format!(
-                "Expected Material section (0x{:04X}), got 0x{:04X}",
-                RW_SECTION_MATERIAL, section_type
+                "Expected Material section (0x{:04X}), got 0x{:04X} at position 0x{:X}. File may be corrupted.",
+                RW_SECTION_MATERIAL, section_type, current_pos
+            )));
+        }
+
+        // Check if the section size is reasonable and doesn't exceed file bounds
+        if section_size == 0 {
+            return Err(DffError::InvalidFormat("Material section has zero size".to_string()));
+        }
+
+        let section_end_pos = current_pos + 12 + section_size as u64;
+        if section_end_pos > file_size {
+            return Err(DffError::InvalidFormat(format!(
+                "Material section size {} exceeds file bounds (would end at 0x{:X}, file size 0x{:X})",
+                section_size, section_end_pos, file_size
             )));
         }
 
         let material_start_pos = reader.stream_position()?;
         let material_end_pos = material_start_pos + section_size as u64;
 
+        // Check if we have enough data for the basic material struct
+        let remaining_in_section = material_end_pos - material_start_pos;
+        if remaining_in_section < 12 { // STRUCT header
+            return Err(DffError::InvalidFormat(format!(
+                "Material section too small for STRUCT header: {} bytes available", remaining_in_section
+            )));
+        }
+
         // Read struct section
-        let (_struct_type, _struct_size, _struct_version) = Self::read_section_header(reader)?;
+        let (_struct_type, struct_size, _struct_version) = Self::read_section_header(reader)?;
+
+        // Basic material data should be at least 28 bytes (4 u32 + 4 u8 + 3 f32)
+        if struct_size < 28 {
+            return Err(DffError::InvalidFormat(format!(
+                "Material STRUCT section too small: {} bytes, expected at least 28", struct_size
+            )));
+        }
 
         let _unknown1 = Self::read_u32(reader)?;
         let color = Color {

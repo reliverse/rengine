@@ -480,13 +480,13 @@ class DFFConverterHandler:
         self.logger = logger
 
     def convert_to_obj(self, dff_file: str, obj_file: str, txd_file: Optional[str] = None,
-                      deps: DependencyManager = None) -> Dict[str, Any]:
-        """Convert DFF file to OBJ format with optional TXD materials"""
+                      use_csv: bool = True, deps: DependencyManager = None) -> Dict[str, Any]:
+        """Convert DFF file to OBJ format with optional TXD materials and CSV support"""
 
         from .modules.dff_to_obj import DFFToOBJConverter
 
         converter = DFFToOBJConverter(self.logger)
-        return converter.convert(dff_file, obj_file, txd_file)
+        return converter.convert(dff_file, obj_file, txd_file, use_csv)
 
 
 

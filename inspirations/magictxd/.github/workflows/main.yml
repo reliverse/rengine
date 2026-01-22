@@ -1,0 +1,163 @@
+name: CI - Build Magic.TXD (Windows / Linux / macOS)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: magic-txd-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-matrix:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-msvc
+            runner: windows-latest
+            tool: msvc
+          - name: windows-mingw
+            runner: windows-latest
+            tool: mingw
+          - name: linux
+            runner: ubuntu-latest
+            tool: gcc
+          - name: macos
+            runner: macos-latest
+            tool: clang
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python (needed for pyzstd and other python-based build steps)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'   # use the Python version your build/requirements need
+
+      - name: Upgrade pip/setuptools/wheel
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install pyzstd (prefer binary wheel to avoid compiling C extension)
+        run: |
+          python -m pip install --only-binary=:all: pyzstd || python -m pip install pyzstd
+        continue-on-error: false
+
+      - name: Setup MSYS2 (for MinGW) and install Python/pip (MinGW job only)
+        if: matrix.tool == 'mingw'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+
+      - name: Ensure MinGW Python and pip are available (MinGW)
+        if: matrix.tool == 'mingw'
+        shell: bash
+        run: |
+          # Install MinGW python/pip packages so builds that expect MinGW python work
+          pacman -S --noconfirm mingw-w64-x86_64-python mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-setuptools mingw-w64-x86_64-python-wheel
+          export PATH="/mingw64/bin:$PATH"
+          python -V
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --only-binary=:all: pyzstd || python -m pip install pyzstd
+
+      - name: Install Qt (prebuilt)
+        uses: jurplel/install-qt-action@v2
+        with:
+          version: '5.15.2'
+          arch: x64
+        # If this action doesn't meet your runner needs, replace with qt-actions/setup-qt or manual install.
+
+      - name: Show environment (debug)
+        run: |
+          echo "Runner: $RUNNER_OS"
+          python -V
+          qmake --version || true
+          which qmake || true
+          ls -la
+
+      - name: Build (MSVC)
+        if: matrix.tool == 'msvc'
+        shell: bash
+        run: |
+          echo "Building with MSVC (Release)..."
+          cmd.exe /c "msbuild build\\Magic.sln /p:Configuration=Release /m" || (echo "msbuild failed" && exit 1)
+
+      - name: Build (MinGW / Linux / macOS)
+        if: matrix.tool != 'msvc'
+        shell: bash
+        run: |
+          set -e
+          echo "Running repository build script (if present)..."
+          if [ -x build/cbp_initbuild.script ]; then
+            ./build/cbp_initbuild.script || (echo "build script failed" && exit 1)
+          else
+            if command -v qmake >/dev/null 2>&1; then
+              PROJ=$(find . -maxdepth 2 -type f \( -name "*.pro" -o -name "magic-txd.pro" \) | head -n1 || true)
+              if [ -n "$PROJ" ]; then
+                qmake "$PROJ" || true
+                make -j$(nproc) || true
+              else
+                if command -v codeblocks >/dev/null 2>&1; then
+                  codeblocks --build build/magic-txd.cbp || true
+                else
+                  echo "No known build method found. Please update this workflow."
+                  exit 1
+                fi
+              fi
+            else
+              echo "qmake not found. Please configure Qt installation or change build steps."
+              exit 1
+            fi
+          fi
+
+      - name: Locate build output
+        id: find_out
+        run: |
+          # Try to find likely executables. Adjust patterns if your build outputs to other names/paths.
+          FOUND=$(find . -type f -iname 'Magic.TXD*' -o -iname 'magic-txd*' -o -iname '*.exe' -maxdepth 6 | tr '\n' ' ')
+          echo "found=$FOUND" >> $GITHUB_OUTPUT
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: magic-txd-${{ matrix.name }}-${{ github.run_number }}
+          path: |
+            ${{ steps.find_out.outputs.found }}
+            resources/
+            languages/
+            data/
+
+      - name: Install NSIS (Windows)
+        if: matrix.tool == 'msvc' && runner.os == 'Windows'
+        run: |
+          choco install nsis -y
+          refreshenv || true
+          echo "NSIS installed"
+        shell: cmd
+
+      - name: Create NSIS installer (Windows)
+        if: matrix.tool == 'msvc' && runner.os == 'Windows'
+        shell: bash
+        run: |
+          NSI_FILE=$(find installer -maxdepth 2 -type f -iname '*.nsi' | head -n1 || true)
+          if [ -z "$NSI_FILE" ]; then
+            echo "No .nsi found under installer/. Skipping."
+            exit 0
+          fi
+          echo "Using NSI script: $NSI_FILE"
+          makensis "$NSI_FILE" || (echo "makensis failed" && exit 1)
+
+      - name: Upload installer artifact (Windows)
+        if: matrix.tool == 'msvc' && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: magic-txd-installer-${{ github.run_number }}
+          path: |
+            installer/*.exe
+            *.exe

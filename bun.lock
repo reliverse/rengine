@@ -154,6 +154,14 @@
         "web-vitals": "^5.1.0",
       },
     },
+    "adapters/python": {
+      "name": "@rengine/python-adapters",
+      "version": "1.0.0",
+    },
+    "adapters/rust-cli": {
+      "name": "@rengine/rust-cli",
+      "version": "1.0.0",
+    },
   },
   "packages": {
     "@acemir/cssom": ["@acemir/cssom@0.9.31", "", {}, "sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA=="],
@@ -823,6 +831,10 @@
     "@reliverse/typerso": ["@reliverse/typerso@2.3.4", "", { "dependencies": { "left-pad": "^1.3.0", "pkg-types": "^2.3.0" } }, "sha512-hCKw2WjmTm1v2NISiubDPXj8iaqHe/5imA5VeDsfbUOU0zONNCJiklnxTDL9cUQrPNHqX6vFtFARW4mdnNXI1Q=="],
 
     "@remix-run/node-fetch-server": ["@remix-run/node-fetch-server@0.9.0", "", {}, "sha512-SoLMv7dbH+njWzXnOY6fI08dFMI5+/dQ+vY3n8RnnbdG7MdJEgiP28Xj/xWlnRnED/aB6SFw56Zop+LbmaaKqA=="],
+
+    "@rengine/python-adapters": ["@rengine/python-adapters@workspace:adapters/python"],
+
+    "@rengine/rust-cli": ["@rengine/rust-cli@workspace:adapters/rust-cli"],
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.0-beta.53", "", {}, "sha512-vENRlFU4YbrwVqNDZ7fLvy+JR1CRkyr01jhSiDpE1u6py3OMzQfztQU2jxykW3ALNxO4kSlqIDeYyD0Y9RcQeQ=="],
 

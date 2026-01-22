@@ -3,7 +3,7 @@ name = "rengine-qt"
 version = "1.0.0"
 description = "Rengine Qt GUI - Desktop application for GTA file processing"
 authors = [
-    {name = "Rengine Team"}
+    {name = "Reliverse"}
 ]
 readme = "README.md"
 requires-python = ">=3.8"

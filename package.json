@@ -30,7 +30,8 @@
     "test:blender": "cd adapters/python/blender && python3 tests/test_*.py",
     "test:app-qt": "cd adapters/python/app-qt && python3 tests/test_*.py",
     "test:python": "bun test:blender && bun test:app-qt",
-    "ty:cli": "cd adapters/python/app-cli && uv run ty check --output-format concise | head -20"
+    "ty:cli": "cd adapters/python/app-cli && uv run ty check --output-format concise | head -20",
+    "ipl-to-godot:convert:gta-sa": "cd adapters/python/app-cli && bun ipl-to-godot:convert:gta-sa"
   },
   "workspaces": {
     "packages": [

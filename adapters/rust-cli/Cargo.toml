@@ -1,0 +1,49 @@
+[package]
+name = "rengine-cli"
+version = "0.1.0"
+edition = "2024"
+description = "Rust CLI for Rengine - provides all features from Python app-cli"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Core rengine functionality
+rengine-core = { path = "../../crates/core" }
+
+# CLI parsing
+clap = { version = "4.0", features = ["derive"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# File system operations
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+
+# Image processing (for TXD extraction)
+image = "0.25"
+# DXT texture decompression
+bcndecode = "0.2"
+
+# Additional utilities
+glob = "0.3"
+walkdir = "2.0"
+regex = "1.0"
+csv = "1.3"
+
+# CLI completion
+clap_complete = "4.0"
+
+# Testing
+tempfile = "3.0"
+
+[dev-dependencies]
+# Integration test dependencies

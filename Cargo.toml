@@ -123,7 +123,7 @@ readme = "README.md"
 
 [workspace]
 members = ["crates/bevy/*", "crates/core", "crates/godot/rw"]
-exclude = ["crates/bevy/rerecast", "crates/bevy/transform-gizmo", "adapters/fiber/src-tauri", "adapters/godot"]
+exclude = ["crates/bevy/rerecast", "crates/bevy/transform-gizmo", "adapters/fiber/src-tauri", "adapters/godot", "adapters/rust-cli"]
 resolver = "2"
 
 

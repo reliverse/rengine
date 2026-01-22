@@ -74,9 +74,85 @@ pub struct IPLFile {
 
 impl IPLFile {
     pub fn load_from_path(path: &str) -> Result<Self, IplError> {
-        let content = std::fs::read_to_string(path).map_err(|e| IplError::Io(e))?;
+        let data = std::fs::read(path).map_err(|e| IplError::Io(e))?;
 
-        Self::parse_text_ipl(&content)
+        // Check if this is a binary IPL file (starts with "bnry")
+        if data.len() >= 4 && &data[0..4] == b"bnry" {
+            Self::parse_binary_ipl(&data)
+        } else {
+            // Try to parse as text IPL
+            let content = std::str::from_utf8(&data)
+                .map_err(|_| IplError::InvalidFormat("File is not valid UTF-8".to_string()))?;
+            Self::parse_text_ipl(content)
+        }
+    }
+
+    fn parse_binary_ipl(data: &[u8]) -> Result<Self, IplError> {
+        if data.len() < 32 {
+            return Err(IplError::InvalidFormat("Binary IPL file too short".to_string()));
+        }
+
+        // Read header (32 bytes)
+        // Format: "bnry" + 7 u32 values (num_instances + 6 offsets)
+        let num_instances = u32::from_le_bytes(data[4..8].try_into().unwrap()) as usize;
+
+        // Instance data starts at offset specified in header (usually 32)
+        let instances_offset = u32::from_le_bytes(data[12..16].try_into().unwrap()) as usize;
+
+        if instances_offset >= data.len() {
+            return Err(IplError::InvalidFormat("Invalid instances offset".to_string()));
+        }
+
+        let mut instances = Vec::new();
+
+        // Each instance is 40 bytes: 7 floats (28 bytes) + 3 ints (12 bytes)
+        let instance_size = 40;
+        let instance_data_start = instances_offset;
+
+        for i in 0..num_instances {
+            let offset = instance_data_start + i * instance_size;
+
+            if offset + instance_size > data.len() {
+                return Err(IplError::InvalidFormat(format!("Incomplete instance data at index {}", i)));
+            }
+
+            // Read binary instance data
+            let x_pos = f32::from_le_bytes(data[offset..offset+4].try_into().unwrap());
+            let y_pos = f32::from_le_bytes(data[offset+4..offset+8].try_into().unwrap());
+            let z_pos = f32::from_le_bytes(data[offset+8..offset+12].try_into().unwrap());
+            let x_rot = f32::from_le_bytes(data[offset+12..offset+16].try_into().unwrap());
+            let y_rot = f32::from_le_bytes(data[offset+16..offset+20].try_into().unwrap());
+            let z_rot = f32::from_le_bytes(data[offset+20..offset+24].try_into().unwrap());
+            let w_rot = f32::from_le_bytes(data[offset+24..offset+28].try_into().unwrap());
+            let obj_id = i32::from_le_bytes(data[offset+28..offset+32].try_into().unwrap());
+            let interior = i32::from_le_bytes(data[offset+32..offset+36].try_into().unwrap());
+            let lod = i32::from_le_bytes(data[offset+36..offset+40].try_into().unwrap());
+
+            // Create quaternion if rotation values are valid
+            let rotation_quat = if x_rot != 0.0 || y_rot != 0.0 || z_rot != 0.0 || w_rot != 0.0 {
+                Some(Quaternion { x: x_rot, y: y_rot, z: z_rot, w: w_rot })
+            } else {
+                None
+            };
+
+            instances.push(IPLInstance {
+                id: obj_id,
+                model_name: format!("{}", obj_id), // Binary IPL doesn't store model names, just IDs
+                interior,
+                position: Vector3 { x: x_pos, y: y_pos, z: z_pos },
+                rotation: Vector3 { x: x_rot, y: y_rot, z: z_rot }, // Euler angles (converted from quat if available)
+                rotation_quat,
+                lod,
+            });
+        }
+
+        Ok(IPLFile {
+            instances,
+            culls: Vec::new(), // Binary IPL may have other sections, but we focus on instances for now
+            zones: Vec::new(),
+            picks: Vec::new(),
+            path_count: Vec::new(),
+        })
     }
 
     fn parse_text_ipl(content: &str) -> Result<Self, IplError> {

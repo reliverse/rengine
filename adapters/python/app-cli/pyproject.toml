@@ -3,7 +3,7 @@ name = "rengine-cli"
 version = "1.0.0"
 description = "Rengine CLI - Comprehensive GTA File Processing Tool"
 authors = [
-    {name = "Rengine Team"}
+    {name = "Reliverse"}
 ]
 readme = "README.md"
 requires-python = ">=3.8"

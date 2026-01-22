@@ -1,0 +1,230 @@
+# Justfile for Rengine Rust CLI
+# A command runner for development tasks
+
+# Default recipe (shows help)
+default:
+    @just --list
+
+# Development
+dev:
+    cargo run
+
+watch:
+    cargo watch -x run
+
+watch-test:
+    cargo watch -x test
+
+watch-check:
+    cargo watch -x check
+
+# Building
+build:
+    cargo build
+
+build-release:
+    cargo build --release
+
+build-windows:
+    cargo build --release --target x86_64-pc-windows-gnu
+
+install:
+    cargo install --path .
+
+# Testing
+test:
+    cargo test
+
+test-unit:
+    cargo test --lib
+
+test-integration:
+    cargo test --test integration
+
+test-release:
+    cargo test --release
+
+gta-test:
+    cargo test --test integration -- --nocapture
+
+gta-test-verbose:
+    RUST_LOG=debug cargo test --test integration -- --nocapture
+
+# Code Quality
+check:
+    cargo check
+
+clippy:
+    cargo clippy
+
+clippy-fix:
+    cargo clippy --fix
+
+fmt:
+    cargo fmt
+
+fmt-check:
+    cargo fmt --check
+
+lint: clippy fmt-check
+
+lint-fix: clippy-fix fmt
+
+quality: clippy fmt-check test
+
+ci: fmt-check clippy test-release
+
+pre-commit: fmt-check clippy test
+
+# Documentation
+doc:
+    cargo doc --open
+
+doc-no-open:
+    cargo doc
+
+# Dependencies
+audit:
+    cargo audit
+
+outdated:
+    cargo outdated
+
+update:
+    cargo update
+
+deps-tree:
+    cargo tree
+
+deps-licenses:
+    cargo tree | grep -E '^[^│├└ ]'
+
+# Binary management
+size: build-release
+    ls -lh target/release/rengine-cli
+
+strip: build-release
+    strip target/release/rengine-cli
+
+# Utility
+clean:
+    cargo clean
+
+help:
+    cargo run -- --help
+
+version:
+    cargo run -- --version
+
+examples: help
+    @echo "\nAvailable commands:"
+    @cargo run -- --help | grep -A 100 "Available commands"
+
+# Demo commands (requires GTA SA files)
+demo-dff:
+    cargo run -- dff info /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/15x125Road1.dff
+
+demo-txd:
+    cargo run -- txd info /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/2notherbuildsfe.txd
+
+demo-img:
+    cargo run -- img info /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/models/gta3.img
+
+demo-col:
+    cargo run -- col info /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/coll/vehicles.col
+
+demo-ipl:
+    cargo run -- ipl info /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/barriers1.ipl
+
+demo-rw:
+    cargo run -- rw analyze /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/15x125Road1.dff --depth 3
+
+demo-convert:
+    cargo run -- dff-to-obj /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/15x125Road1.dff --output /tmp/test.obj
+
+gta-convert:
+    cargo run -- ipl-to-godot /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa --output /home/blefnk/B/R/reliverse/rengine/examples/godot/gta-sa-map --project-name GTA-SA-Map --convert-assets --dff-path /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/models --txd-path /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/models
+
+batch-analyze-50:
+    cargo run -- batch analyze /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa --format all --recursive --max-files 50
+
+# Development workflow aliases
+setup: update fmt
+    @echo "Development environment ready!"
+
+full-test: test-unit test-integration
+    @echo "All tests passed! ✅"
+
+release-build: fmt clippy build-release test-release
+    @echo "Release build complete! 🚀"
+
+# Performance testing
+bench:
+    cargo bench
+
+# Cross-platform builds
+build-all: build-release build-windows
+    @echo "Cross-platform builds complete!"
+
+# Cleanup and maintenance
+deep-clean: clean
+    rm -rf target/
+    rm -rf Cargo.lock
+
+# Quick development cycle
+dev-cycle: fmt-check clippy test
+    @echo "Development cycle complete! 🔄"
+
+# Show project status
+status:
+    @echo "=== Rengine Rust CLI Status ==="
+    @echo "Rust version: $(rustc --version)"
+    @echo "Cargo version: $(cargo --version)"
+    @echo "Target: $(rustc -vV | grep host | cut -d' ' -f2)"
+    @echo ""
+    @echo "Code quality:"
+    @just fmt-check &>/dev/null && echo "  ✅ Formatting" || echo "  ❌ Formatting"
+    @just clippy &>/dev/null && echo "  ✅ Linting" || echo "  ❌ Linting"
+    @just test &>/dev/null && echo "  ✅ Tests" || echo "  ❌ Tests"
+    @echo ""
+    @echo "Available commands: $(just --list | wc -l)"
+    @echo "Total recipes: $(grep -c "^[a-zA-Z_][a-zA-Z0-9_-]*:" justfile)"
+
+# Aliases for common tasks
+t: test
+b: build
+br: build-release
+c: check
+f: fmt
+l: lint
+q: quality
+
+# User-friendly aliases
+analyze: (batch-analyze-50)
+convert: (convert-dff-5)
+godot: (godot-quick)
+wizard:
+    cargo run -- wizard
+
+# Interactive helpers
+convert-dff-5:
+    @echo "Convert first 5 DFF files to OBJ format"
+    cargo run -- convert dff /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa --max-files 5 --output-dir /tmp/dff_output
+
+godot-quick:
+    @echo "Convert GTA SA IPL directory to Godot project"
+    cargo run -- godot /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa --output /tmp/godot-project
+
+# Completion setup
+completion-bash:
+    rengine-cli completion bash > ~/.bash_completion.d/rengine-cli
+    @echo "Add this to ~/.bashrc:"
+    @echo "source ~/.bash_completion.d/rengine-cli"
+
+completion-zsh:
+    rengine-cli completion zsh > ~/.zsh/_rengine-cli
+    @echo "Completion installed for zsh"
+
+completion-fish:
+    rengine-cli completion fish > ~/.config/fish/completions/rengine-cli.fish
+    @echo "Completion installed for fish"

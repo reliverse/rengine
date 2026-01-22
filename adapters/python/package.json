@@ -13,6 +13,12 @@
     "type:all": "bun app-qt:type && bun blender:type && bun app-cli:type",
     "clean:all": "bun app-qt:clean && bun blender:clean && bun app-cli:clean",
 
+    "ipl:workflow": "bun ipl-to-godot:convert:gta-sa",
+    "ipl:quickstart": "bun ipl-to-godot:info && bun ipl-to-godot:setup:godot && bun ipl-to-godot:setup:rust",
+
+    "dff:workflow": "bun dff-to-obj:convert:all",
+    "dff:quickstart": "bun dff-to-obj:info && bun dff-to-obj:setup:pillow",
+
     "app-qt:install": "cd app-qt && uv sync",
     "app-qt:run": "cd app-qt && uv run python -m application.main",
     "app-qt:run:x11": "cd app-qt && bash run_app.sh",
@@ -35,12 +41,10 @@
     "blender:lint": "cd blender && uv run ruff check .",
     "blender:format": "cd blender && uv run ruff check --fix . && uv run ruff format .",
     "blender:type": "cd blender && uv run ty check .",
-    "blender:install:addon": "cd blender && echo 'To install as Blender addon: Edit > Preferences > Add-ons > Install from File > select dragonff.zip'",
     "blender:clean": "cd blender && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && find . -name '*.pyc' -delete && rm -rf .venv",
 
     "app-cli:install": "cd app-cli && uv sync",
     "app-cli:run": "cd app-cli && uv run python cli.py",
-    "app-cli:run:script": "cd app-cli && uv run python run_cli.py",
     "app-cli:test": "cd app-cli && uv run pytest",
     "app-cli:check": "cd app-cli && uv run python -c \"import cli; from cli import RengineCLI; print('✓ CLI functionality check passed')\"",
     "app-cli:lint": "cd app-cli && uv run ruff check .",
@@ -49,10 +53,7 @@
     "app-cli:help": "cd app-cli && uv run python cli.py --help",
     "app-cli:clean": "cd app-cli && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && find . -name '*.pyc' -delete && rm -rf .venv",
 
-    "deps:check": "echo 'Checking Python dependencies...' && python3 --version && pip3 --version",
-    "deps:upgrade": "echo 'Upgrading pip...' && pip3 install --upgrade pip",
-
-    "dev:setup": "bun deps:upgrade && bun install:all",
+    "dev:setup": "bun install:all && bun ipl-to-godot:setup:rust",
     "dev:test": "bun test:all",
     "dev:check": "bun check:all",
     "dev:lint": "bun lint:all",
@@ -63,8 +64,29 @@
     "gta:test:dff": "cd app-cli && find /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa -name '*.dff' -size -100k | head -1 | xargs python3 cli.py dff info",
     "gta:test:batch": "cd app-cli && python3 cli.py batch analyze /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa --format dff --max-files 5",
 
-    "docker:build": "echo 'Building Python environment...' && docker build -t rengine-python .",
-    "docker:run": "docker run -it --rm -v $(pwd):/app rengine-python"
+    "dff-to-obj:help": "cd app-cli && python3 run_cli.py dff-to-obj --help",
+    "dff-to-obj:convert:gta-sa": "cd app-cli && mkdir -p /home/blefnk/B/R/reliverse/rengine/examples/obj/gta-sa-models && python3 -c \"from rengine_cli.modules.dff_to_obj import DFFToOBJConverter; import glob; files = glob.glob('/home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/**/*.dff', recursive=True); result = DFFToOBJConverter.batch_convert(files[:50], '/home/blefnk/B/R/reliverse/rengine/examples/obj/gta-sa-models', max_workers=8); print('Conversion complete:', result['successful'], '/', result['files_to_convert'], 'files (', result['skipped_files'], 'skipped,', result['failed'], 'failed)')\"",
+    "dff-to-obj:convert:all": "cd app-cli && mkdir -p /home/blefnk/B/R/reliverse/rengine/examples/obj/gta-sa-models && python3 -c \"from rengine_cli.modules.dff_to_obj import DFFToOBJConverter; import glob; files = glob.glob('/home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/**/*.dff', recursive=True); print('Found', len(files), 'DFF files, starting conversion...'); result = DFFToOBJConverter.batch_convert(files, '/home/blefnk/B/R/reliverse/rengine/examples/obj/gta-sa-models', max_workers=12); print('Conversion complete:', result['successful'], '/', result['files_to_convert'], 'files (', result['skipped_files'], 'skipped,', result['failed'], 'failed)')\"",
+    "dff-to-obj:convert:file": "cd app-cli && echo 'Usage: bun dff-to-obj:convert:file --file=path/to/file.dff --output=path/to/output.obj [--txd=path/to/file.txd]' && exit 1",
+    "dff-to-obj:test": "cd app-cli && find /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa -name '*.dff' -size -100k | head -1 | xargs -I {} bash -c 'dff=\"{}\"; base=$(basename \"$dff\" .dff); python3 run_cli.py dff-to-obj \"$dff\" --output \"/tmp/${base}.obj\" 2>/dev/null && echo \"✓ Test conversion successful: /tmp/${base}.obj\" || echo \"✗ Test conversion failed\"'",
+    "dff-to-obj:list": "find /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa -name '*.dff' -type f | sort | head -20",
+    "dff-to-obj:analyze": "cd app-cli && find /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa -name '*.dff' -size -100k | head -1 | xargs python3 cli.py dff analyze",
+    "dff-to-obj:clean:models": "rm -rf examples/obj/gta-sa-models && echo 'Cleaned examples/obj/gta-sa-models directory.'",
+    "dff-to-obj:setup:pillow": "echo 'Install PIL/Pillow for texture extraction:' && echo '  pip install pillow' && echo '  # or' && echo '  uv add pillow'",
+    "dff-to-obj:info": "echo 'DFF to OBJ Converter - Converts GTA DFF models to OBJ format' && echo 'Features: Automatic TXD detection, GTA SA CSV integration' && echo 'Docs: ./(docs)/DFF_TO_OBJ.md' && echo 'Usage: bun dff:workflow'",
+
+    "ipl-to-godot:help": "cd app-cli && python3 run_cli.py ipl-to-godot --help",
+    "ipl-to-godot:convert:gta-sa": "cd app-cli && python3 run_cli.py ipl-to-godot /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa --output /home/blefnk/B/R/reliverse/rengine/examples/godot/gta-sa-map --project-name 'GTA-SA-Map'",
+    "ipl-to-godot:convert:file": "cd app-cli && echo 'Usage: bun ipl-to-godot:convert:file --file=path/to/file.ipl --output=path/to/output.tscn' && exit 1",
+    "ipl-to-godot:test": "cd app-cli && find /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa -name '*.ipl' | head -1 | xargs python3 run_cli.py ipl-to-godot | head -20",
+    "ipl-to-godot:list": "find /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa -name '*.ipl' -type f | sort",
+    "ipl-to-godot:analyze": "cd app-cli && python3 run_cli.py ipl analyze /home/blefnk/Documents/reliverse/rengine/preloaded/resources/gta-sa/countrye.ipl",
+    "ipl-to-godot:build:extension": "echo 'Run this from the generated Godot project directory: ./build_extension.sh'",
+    "ipl-to-godot:clean:projects": "rm -rf examples/godot/gta-sa-map && echo 'Cleaned examples/godot/gta-sa-map project.'",
+    "ipl-to-godot:setup:godot": "echo 'Ensure Godot 4.2+ is installed. Visit: https://godotengine.org/download'",
+    "ipl-to-godot:setup:rust": "bash scripts/setup_rust.sh",
+    "ipl-to-godot:setup:rust:manual": "echo 'Manual Rust installation: curl --proto \"=https\" --tlsv1.2 -sSf https://sh.rustup.rs | sh'",
+    "ipl-to-godot:info": "echo 'IPL to Godot Converter - Converts GTA IPL files to Godot projects' && echo 'Docs: ./IPL_TO_GODOT.md' && echo 'Usage: bun ipl-to-godot:convert:gta-sa'"
   },
   "keywords": [
     "gta",
@@ -73,9 +95,18 @@
     "blender",
     "qt",
     "python",
-    "cli"
+    "cli",
+    "ipl",
+    "godot",
+    "dff",
+    "obj",
+    "3d-models",
+    "game-development",
+    "level-design",
+    "map-conversion",
+    "model-conversion"
   ],
-  "author": "Rengine Team",
+  "author": "Reliverse",
   "license": "GPL-3.0",
   "repository": {
     "type": "git",
@@ -85,13 +116,5 @@
   "bugs": {
     "url": "https://github.com/reliverse/rengine/issues"
   },
-  "homepage": "https://github.com/reliverse/rengine#readme",
-  "engines": {
-    "node": ">=14.0.0"
-  },
-  "workspaces": [
-    "app-qt",
-    "blender",
-    "app-cli"
-  ]
+  "homepage": "https://github.com/reliverse/rengine#readme"
 }
