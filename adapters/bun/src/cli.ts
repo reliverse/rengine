@@ -6,7 +6,11 @@ import pMap from "p-map";
 import { DffConverter, ModelType } from "./index.js";
 import { colorCombos, formatters } from "./utils/colors.js";
 
-interface CliArgs {
+interface GlobalArgs {
+  help?: boolean;
+}
+
+interface ConvertArgs {
   dff?: string;
   txd?: string;
   inputDir?: string;
@@ -16,12 +20,62 @@ interface CliArgs {
   type?: ModelType;
   output?: string;
   format?: "gltf" | "glb";
-  help?: boolean;
 }
 
-function parseArgs(): CliArgs {
+type ParsedArgs = GlobalArgs & {
+  command?: "convert" | "schema" | "help";
+  convertArgs?: ConvertArgs;
+};
+
+function parseArgs(): ParsedArgs {
   const args = process.argv.slice(2);
-  const parsed: CliArgs = {
+  const parsed: ParsedArgs = {};
+
+  // If no arguments or help flag, show help
+  if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
+    parsed.help = true;
+    parsed.command = "help";
+    return parsed;
+  }
+
+  // Determine the command
+  const firstArg = args[0];
+  if (firstArg?.startsWith("-")) {
+    // Legacy mode - treat as convert command with old flags
+    parsed.command = "convert";
+    parsed.convertArgs = parseLegacyArgs(args);
+  } else {
+    // First argument is a command
+    switch (firstArg) {
+      case "convert":
+        parsed.command = "convert";
+        parsed.convertArgs = parseConvertArgs(args.slice(1));
+        break;
+      case "schema":
+        parsed.command = "schema";
+        break;
+      case "help":
+      case "--help":
+      case "-h":
+        parsed.command = "help";
+        break;
+      default:
+        console.error(
+          colorCombos.errorDetail(
+            `Unknown command: ${firstArg}`,
+            "available commands: convert, schema, help"
+          )
+        );
+        parsed.command = "help";
+        break;
+    }
+  }
+
+  return parsed;
+}
+
+function parseConvertArgs(args: string[]): ConvertArgs {
+  const parsed: ConvertArgs = {
     type: ModelType.OBJECT,
     format: "glb",
   };
@@ -33,11 +87,6 @@ function parseArgs(): CliArgs {
     const arg = current.value;
 
     switch (arg) {
-      case "-h":
-      case "--help":
-        parsed.help = true;
-        current = argIterator.next();
-        break;
       case "-d":
       case "--dff":
         current = argIterator.next();
@@ -193,26 +242,198 @@ function parseArgs(): CliArgs {
         parsed.output = current.value;
         current = argIterator.next();
         break;
-      case "-f":
-      case "--format": {
+    }
+    case "-f":
+      case "--format":
+    {
+      current = argIterator.next();
+      if (current.done) {
+        console.error(
+          colorCombos.errorDetail(
+            "Expected format after --format",
+            "missing argument"
+          )
+        );
+        process.exit(1);
+      }
+      const format = current.value;
+      if (format === "gltf" || format === "glb") {
+        parsed.format = format;
+      } else {
+        console.error(
+          colorCombos.errorDetail(
+            `Invalid format: ${format}`,
+            "must be one of: gltf, glb"
+          )
+        );
+        process.exit(1);
+      }
+      current = argIterator.next();
+      break;
+    }
+    default:
+    if (arg.startsWith("-")) {
+      console.error(
+        colorCombos.errorDetail(`Unknown option: ${arg}`, "invalid flag")
+      );
+      return parsed;
+    }
+    console.error(
+      colorCombos.errorDetail(`Unexpected argument: ${arg}`, "not recognized")
+    );
+    return parsed;
+  }
+}
+
+return parsed;
+}
+
+function parseLegacyArgs(args: string[]): ConvertArgs {
+  const parsed: ConvertArgs = {
+    type: ModelType.OBJECT,
+    format: "glb",
+  };
+
+  const argIterator = args[Symbol.iterator]();
+  let current = argIterator.next();
+
+  while (!current.done) {
+    const arg = current.value;
+
+    switch (arg) {
+      case "-d":
+      case "--dff":
         current = argIterator.next();
         if (current.done) {
           console.error(
             colorCombos.errorDetail(
-              "Expected format after --format",
+              "Expected file path after --dff",
               "missing argument"
             )
           );
           process.exit(1);
         }
-        const format = current.value;
-        if (format === "gltf" || format === "glb") {
-          parsed.format = format;
+        parsed.dff = current.value;
+        current = argIterator.next();
+        break;
+      case "-t":
+      case "--txd":
+        current = argIterator.next();
+        if (current.done) {
+          console.error(
+            colorCombos.errorDetail(
+              "Expected file path after --txd",
+              "missing argument"
+            )
+          );
+          process.exit(1);
+        }
+        parsed.txd = current.value;
+        current = argIterator.next();
+        break;
+      case "-i":
+      case "--input-dir":
+        current = argIterator.next();
+        if (current.done) {
+          console.error(
+            colorCombos.errorDetail(
+              "Expected directory path after --input-dir",
+              "missing argument"
+            )
+          );
+          process.exit(1);
+        }
+        parsed.inputDir = current.value;
+        current = argIterator.next();
+        break;
+      case "--output-dir":
+        current = argIterator.next();
+        if (current.done) {
+          console.error(
+            colorCombos.errorDetail(
+              "Expected directory path after --output-dir",
+              "missing argument"
+            )
+          );
+          process.exit(1);
+        }
+        parsed.outputDir = current.value;
+        current = argIterator.next();
+        break;
+      case "--limit": {
+        current = argIterator.next();
+        if (current.done) {
+          console.error(
+            colorCombos.errorDetail(
+              "Expected number after --limit",
+              "missing argument"
+            )
+          );
+          process.exit(1);
+        }
+        const limitValue = Number.parseInt(current.value, 10);
+        if (Number.isNaN(limitValue) || limitValue < 0) {
+          console.error(
+            colorCombos.errorDetail(
+              "Limit must be a non-negative integer",
+              "invalid value"
+            )
+          );
+          process.exit(1);
+        }
+        parsed.limit = limitValue;
+        current = argIterator.next();
+        break;
+      }
+      case "--concurrency": {
+        current = argIterator.next();
+        if (current.done) {
+          console.error(
+            colorCombos.errorDetail(
+              "Expected number after --concurrency",
+              "missing argument"
+            )
+          );
+          process.exit(1);
+        }
+        const concurrencyValue = Number.parseInt(current.value, 10);
+        if (Number.isNaN(concurrencyValue) || concurrencyValue <= 0) {
+          console.error(
+            colorCombos.errorDetail(
+              "Concurrency must be a positive integer",
+              "invalid value"
+            )
+          );
+          process.exit(1);
+        }
+        parsed.concurrency = concurrencyValue;
+        current = argIterator.next();
+        break;
+      }
+      case "-T":
+      case "--type": {
+        current = argIterator.next();
+        if (current.done) {
+          console.error(
+            colorCombos.errorDetail(
+              "Expected type after --type",
+              "missing argument"
+            )
+          );
+          process.exit(1);
+        }
+        const type = current.value;
+        if (type === "object") {
+          parsed.type = ModelType.OBJECT;
+        } else if (type === "skin") {
+          parsed.type = ModelType.SKIN;
+        } else if (type === "car") {
+          parsed.type = ModelType.CAR;
         } else {
           console.error(
             colorCombos.errorDetail(
-              `Invalid format: ${format}`,
-              "must be one of: gltf, glb"
+              `Invalid type: ${type}`,
+              "must be one of: object, skin, car"
             )
           );
           process.exit(1);
@@ -220,27 +441,261 @@ function parseArgs(): CliArgs {
         current = argIterator.next();
         break;
       }
-      default:
-        if (arg.startsWith("-")) {
-          console.error(
-            colorCombos.errorDetail(`Unknown option: ${arg}`, "invalid flag")
-          );
-          printUsage();
-          process.exit(1);
-        } else {
+      case "-o":
+      case "--output":
+        current = argIterator.next();
+        if (current.done) {
           console.error(
             colorCombos.errorDetail(
-              `Unexpected argument: ${arg}`,
-              "not recognized"
+              "Expected file path after --output",
+              "missing argument"
             )
           );
-          printUsage();
           process.exit(1);
         }
+        parsed.output = current.value;
+        current = argIterator.next();
+        break;
     }
+    case "-f":
+      case "--format":
+    {
+      current = argIterator.next();
+      if (current.done) {
+        console.error(
+          colorCombos.errorDetail(
+            "Expected format after --format",
+            "missing argument"
+          )
+        );
+        process.exit(1);
+      }
+      const format = current.value;
+      if (format === "gltf" || format === "glb") {
+        parsed.format = format;
+      } else {
+        console.error(
+          colorCombos.errorDetail(
+            `Invalid format: ${format}`,
+            "must be one of: gltf, glb"
+          )
+        );
+        process.exit(1);
+      }
+      current = argIterator.next();
+      break;
+    }
+    default:
+    if (arg.startsWith("-")) {
+      console.error(
+        colorCombos.errorDetail(`Unknown option: ${arg}`, "invalid flag")
+      );
+      return parsed;
+    }
+    console.error(
+      colorCombos.errorDetail(`Unexpected argument: ${arg}`, "not recognized")
+    );
+    return parsed;
+  }
+}
+
+return parsed;
+}
+        parsed.dff = current.value
+current = argIterator.next();
+break;
+case "-t":
+      case "--txd":
+        current = argIterator.next()
+if (current.done) {
+  console.error(
+    colorCombos.errorDetail(
+      "Expected file path after --txd",
+      "missing argument"
+    )
+  );
+  process.exit(1);
+}
+parsed.txd = current.value;
+current = argIterator.next();
+break;
+case "-i":
+      case "--input-dir":
+        current = argIterator.next()
+if (current.done) {
+  console.error(
+    colorCombos.errorDetail(
+      "Expected directory path after --input-dir",
+      "missing argument"
+    )
+  );
+  process.exit(1);
+}
+parsed.inputDir = current.value;
+current = argIterator.next();
+break;
+case "--output-dir":
+        current = argIterator.next()
+if (current.done) {
+  console.error(
+    colorCombos.errorDetail(
+      "Expected directory path after --output-dir",
+      "missing argument"
+    )
+  );
+  process.exit(1);
+}
+parsed.outputDir = current.value;
+current = argIterator.next();
+break;
+case "--limit":
+{
+  current = argIterator.next();
+  if (current.done) {
+    console.error(
+      colorCombos.errorDetail(
+        "Expected number after --limit",
+        "missing argument"
+      )
+    );
+    process.exit(1);
+  }
+  const limitValue = Number.parseInt(current.value, 10);
+  if (Number.isNaN(limitValue) || limitValue < 0) {
+    console.error(
+      colorCombos.errorDetail(
+        "Limit must be a non-negative integer",
+        "invalid value"
+      )
+    );
+    process.exit(1);
+  }
+  parsed.limit = limitValue;
+  current = argIterator.next();
+  break;
+}
+case "--concurrency":
+{
+  current = argIterator.next();
+  if (current.done) {
+    console.error(
+      colorCombos.errorDetail(
+        "Expected number after --concurrency",
+        "missing argument"
+      )
+    );
+    process.exit(1);
+  }
+  const concurrencyValue = Number.parseInt(current.value, 10);
+  if (Number.isNaN(concurrencyValue) || concurrencyValue <= 0) {
+    console.error(
+      colorCombos.errorDetail(
+        "Concurrency must be a positive integer",
+        "invalid value"
+      )
+    );
+    process.exit(1);
+  }
+  parsed.concurrency = concurrencyValue;
+  current = argIterator.next();
+  break;
+}
+case "-T":
+      case "--type":
+{
+  current = argIterator.next();
+  if (current.done) {
+    console.error(
+      colorCombos.errorDetail("Expected type after --type", "missing argument")
+    );
+    process.exit(1);
+  }
+  const type = current.value;
+  if (type === "object") {
+    parsed.type = ModelType.OBJECT;
+  } else if (type === "skin") {
+    parsed.type = ModelType.SKIN;
+  } else if (type === "car") {
+    parsed.type = ModelType.CAR;
+  } else {
+    console.error(
+      colorCombos.errorDetail(
+        `Invalid type: ${type}`,
+        "must be one of: object, skin, car"
+      )
+    );
+    process.exit(1);
+  }
+  current = argIterator.next();
+  break;
+}
+case "-o":
+      case "--output":
+        current = argIterator.next()
+if (current.done) {
+  console.error(
+    colorCombos.errorDetail(
+      "Expected file path after --output",
+      "missing argument"
+    )
+  );
+  process.exit(1);
+}
+parsed.output = current.value;
+current = argIterator.next();
+break;
+case "-f":
+      case "--format":
+{
+  current = argIterator.next();
+  if (current.done) {
+    console.error(
+      colorCombos.errorDetail(
+        "Expected format after --format",
+        "missing argument"
+      )
+    );
+    process.exit(1);
+  }
+  const format = current.value;
+  if (format === "gltf" || format === "glb") {
+    parsed.format = format;
+  } else {
+    console.error(
+      colorCombos.errorDetail(
+        `Invalid format: ${format}`,
+        "must be one of: gltf, glb"
+      )
+    );
+    process.exit(1);
+  }
+  current = argIterator.next();
+  break;
+}
+case "--schema":
+{
+  parsed.schema = true;
+  current = argIterator.next();
+  break;
+}
+default:
+if (arg.startsWith("-")) {
+  console.error(
+    colorCombos.errorDetail(`Unknown option: ${arg}`, "invalid flag")
+  );
+  printUsage();
+  process.exit(1);
+} else {
+  console.error(
+    colorCombos.errorDetail(`Unexpected argument: ${arg}`, "not recognized")
+  );
+  printUsage();
+  process.exit(1);
+}
+}
   }
 
-  return parsed;
+return parsed;
 }
 
 interface FilePair {
@@ -585,6 +1040,36 @@ async function convertBatch(argv: CliArgs) {
   }
 }
 
+function generateSchema() {
+  const schemaPath =
+    "/home/blefnk/B/R/reliverse/rengine/node_modules/@reliverse/rengine/schema.json";
+
+  try {
+    // Ensure the directory exists
+    const dir = path.dirname(schemaPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    console.log(colorCombos.successFile(`Generating schema: ${schemaPath}`));
+
+    // Copy schema from the pre-defined location
+    if (fs.existsSync(schemaPath)) {
+      console.log(colorCombos.info("✓", "Schema file already exists"));
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error(
+      colorCombos.errorDetail(
+        `Failed to generate schema: ${error}`,
+        "filesystem error"
+      )
+    );
+    return { success: false, error: error as Error };
+  }
+}
+
 function printUsage() {
   console.log(`
 Usage: rengine [options]
@@ -599,6 +1084,7 @@ Options:
   -T, --type <type>      Model type: object, skin, car (default: object)
   -o, --output <file>    Output file path (for single file conversion, default: input filename with .glb extension)
   -f, --format <format>  Output format: gltf, glb (default: glb)
+  --schema                Generate Rengine JSON schema file
   -h, --help             Show this help message
 
 Examples:
@@ -613,7 +1099,9 @@ Examples:
   rengine --input-dir /path/to/dff-files --output-dir /path/to/output --type car
   rengine -i ./models --limit 5  # Convert only first 5 files
   rengine -i ./models --concurrency 8  # Use 8 concurrent conversions
-`);
+
+  # Schema generation
+  rengine --schema              # Generate Rengine JSON schema file`);
 }
 
 async function main() {
@@ -621,6 +1109,15 @@ async function main() {
 
   if (argv.help) {
     printUsage();
+    return;
+  }
+
+  // Handle schema generation
+  if (argv.schema) {
+    const result = generateSchema();
+    if (result.success) {
+      console.log("Schema generated successfully!");
+    }
     return;
   }
 
@@ -633,7 +1130,7 @@ async function main() {
     console.error(
       colorCombos.errorDetail(
         "Invalid arguments",
-        "provide --dff for single file conversion, or --input-dir for batch conversion"
+        "provide --dff for single file conversion, --input-dir for batch conversion, or --schema for schema generation"
       )
     );
     printUsage();

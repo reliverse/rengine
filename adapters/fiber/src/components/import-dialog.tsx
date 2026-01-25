@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
-import { Box, FileCode, MapIcon, Upload } from "lucide-react";
+import { Box, FileCode, MapIcon, Upload, FileJson } from "lucide-react";
 import { useState } from "react";
 import * as THREE from "three";
 import { Button } from "~/components/ui/button";
@@ -19,6 +19,7 @@ import { useSceneStore } from "~/stores/scene-store";
 import { type ImportProgress, modelImporter } from "~/utils/model-import";
 import { Progress } from "~/components/ui/progress";
 import { deepCloneModel, loadModelsByIdsBatch } from "~/utils/model-loader";
+import { loadScene, deserializeScene } from "~/utils/scene-persistence";
 
 // ============================================================================
 // Types
@@ -634,6 +635,91 @@ export function ImportDialog({ isOpen, onOpenChange }: ImportDialogProps) {
   };
 
   // ========================================================================
+  // JSON Import Handler
+  // ========================================================================
+  const handleJsonImport = async () => {
+    if (isImporting) return;
+
+    try {
+      setIsImporting(true);
+
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: "JSON Scene",
+            extensions: ["json"],
+          },
+        ],
+      });
+
+      if (selected && typeof selected === "string") {
+        setImportProgress({
+          loaded: 0,
+          total: 100,
+          stage: "Loading JSON scene file...",
+        });
+
+        const result = await loadScene(selected);
+
+        if (result.success && result.data) {
+          setImportProgress({
+            loaded: 50,
+            total: 100,
+            stage: "Deserializing scene data...",
+          });
+
+          const sceneState = useSceneStore.getState();
+          const deserialized = deserializeScene(result.data);
+
+          // For import, we add objects to existing scene rather than replacing it
+          const objectsToAdd =
+            deserialized?.objects?.map((obj) => ({
+              ...obj,
+              id: `json_import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              name: `${obj.name} (imported)`,
+            })) ?? [];
+
+          sceneState.addObjects(objectsToAdd);
+
+          setImportProgress({
+            loaded: 100,
+            total: 100,
+            stage: "Import complete",
+          });
+
+          toast({
+            title: "JSON scene imported successfully",
+            description: `Imported ${objectsToAdd.length} objects from JSON file.`,
+            duration: 3000,
+          });
+
+          onOpenChange(false);
+        } else {
+          toast({
+            title: "Import failed",
+            description: result.error || "Failed to load JSON scene file",
+            variant: "destructive",
+            duration: 5000,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("JSON import error:", error);
+      toast({
+        title: "Import failed",
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsImporting(false);
+      setImportProgress(null);
+    }
+  };
+
+  // ========================================================================
   // IPL Import Handler
   // ========================================================================
   const handleIplImport = async () => {
@@ -841,7 +927,7 @@ export function ImportDialog({ isOpen, onOpenChange }: ImportDialogProps) {
           onValueChange={setActiveTab}
           value={activeTab}
         >
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger className="flex items-center gap-2" value="model">
               <Box className="h-4 w-4" />
               Model
@@ -853,6 +939,10 @@ export function ImportDialog({ isOpen, onOpenChange }: ImportDialogProps) {
             <TabsTrigger className="flex items-center gap-2" value="ipl">
               <MapIcon className="h-4 w-4" />
               IPL
+            </TabsTrigger>
+            <TabsTrigger className="flex items-center gap-2" value="json">
+              <FileJson className="h-4 w-4" />
+              JSON
             </TabsTrigger>
           </TabsList>
 
@@ -925,6 +1015,30 @@ export function ImportDialog({ isOpen, onOpenChange }: ImportDialogProps) {
               </p>
             </div>
           </TabsContent>
+
+          {/* JSON Tab */}
+          <TabsContent className="space-y-4" value="json">
+            <div className="text-muted-foreground text-sm">
+              <p className="mb-2">
+                Import Rengine scene files (.json). These files contain complete
+                scene data including objects, lights, and metadata.
+              </p>
+              <p className="mb-2 font-medium">Import behavior:</p>
+              <ul className="ml-4 list-disc space-y-1 text-xs">
+                <li>
+                  <strong>Import</strong> - Adds objects to your current scene
+                </li>
+                <li>
+                  <strong>Open</strong> - Replaces your current scene completely
+                </li>
+              </ul>
+              <p className="mt-2 text-xs">
+                Use the Import button to add objects from a JSON file to your
+                existing scene, or use the Open button in the toolbar to replace
+                the entire scene.
+              </p>
+            </div>
+          </TabsContent>
         </Tabs>
 
         {importProgress && (
@@ -949,6 +1063,7 @@ export function ImportDialog({ isOpen, onOpenChange }: ImportDialogProps) {
               if (activeTab === "model") handleModelImport();
               else if (activeTab === "pwn") handlePwnImport();
               else if (activeTab === "ipl") handleIplImport();
+              else if (activeTab === "json") handleJsonImport();
             }}
           >
             <Upload className="mr-2 h-4 w-4" />

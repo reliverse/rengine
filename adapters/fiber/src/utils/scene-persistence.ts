@@ -3,7 +3,7 @@ import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import type { SceneLight, SceneObject, SceneState } from "~/stores/scene-store";
 
 // Top-level regex for performance
-const RENGINE_EXTENSION_REGEX = /\.rengine$/;
+const RENGINE_EXTENSION_REGEX = /\.json$/;
 
 export interface SceneFileData {
   version: string;
@@ -193,7 +193,7 @@ export function validateSceneFile(data: SceneFileData) {
 export function generateDefaultFilename(): string {
   const now = new Date();
   const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-");
-  return `scene_${timestamp}.rengine`;
+  return `scene_${timestamp}.json`;
 }
 
 /**
@@ -259,7 +259,7 @@ export async function saveScene(
         filters: [
           {
             name: "Rengine Scene",
-            extensions: ["rengine"],
+            extensions: ["json"],
           },
         ],
         defaultPath: generateDefaultFilename(),
@@ -310,7 +310,7 @@ export async function loadScene(filePath?: string): Promise<LoadResult> {
         filters: [
           {
             name: "Rengine Scene",
-            extensions: ["rengine"],
+            extensions: ["json"],
           },
         ],
       });

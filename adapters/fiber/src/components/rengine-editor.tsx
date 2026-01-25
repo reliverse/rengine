@@ -103,7 +103,7 @@ export function RengineEditor() {
 
           const now = new Date();
           const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-");
-          const fileName = `initial_${timestamp}.rengine`;
+          const fileName = `initial_${timestamp}.json`;
           const filePath = await join(autoSaveDir, fileName);
 
           const result = await saveScene(sceneState, filePath, {

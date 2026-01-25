@@ -51,7 +51,7 @@ class ChangeDetector {
   private setupFileWatching(): void {
     this.fileWatcher = new FileWatcher({
       paths: ['scenes/', 'assets/', 'scripts/'],
-      extensions: ['.rengine', '.gltf', '.js', '.ts'],
+      extensions: ['.json', '.gltf', '.js', '.ts'],
       onChange: (filePath, changeType) => {
         this.handleFileChange(filePath, changeType);
       }

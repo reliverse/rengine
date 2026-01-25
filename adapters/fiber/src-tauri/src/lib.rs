@@ -1202,6 +1202,9 @@ pub struct PwnObjectData {
     pub drawdistance: Option<f32>,
     pub areaid: Option<i32>,
     pub priority: Option<u32>,
+    // Actor-specific fields (None for objects)
+    pub invulnerable: Option<bool>,
+    pub health: Option<f32>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1254,11 +1257,10 @@ async fn import_ipl_file(file_path: String) -> Result<rengine_core::renderware::
 
 #[tauri::command]
 async fn parse_pwn_file(file_path: String) -> Result<PwnImportResult, String> {
-    use regex::Regex;
     use std::fs::File;
     use std::io::Read;
 
-    // Read the PWN file
+    // Read PWN file
     let mut file = File::open(&file_path)
         .map_err(|e| format!("Failed to open PWN file {}: {}", file_path, e))?;
 
@@ -1266,79 +1268,7 @@ async fn parse_pwn_file(file_path: String) -> Result<PwnImportResult, String> {
     file.read_to_string(&mut content)
         .map_err(|e| format!("Failed to read PWN file {}: {}", file_path, e))?;
 
-    // Remove multi-line comments first
-    let multiline_comment_re = Regex::new(r"/\*[\s\S]*?\*/")
-        .map_err(|e| format!("Failed to create multiline comment regex: {}", e))?;
-    let content = multiline_comment_re.replace_all(&content, "");
-
-    // Regex patterns to match CreateDynamicObject calls in both formats
-    // Positional format: CreateDynamicObject(modelid, x, y, z, rx, ry, rz[, worldid, interiorid, playerid, streamdistance, drawdistance, areaid, priority]);
-    // Named format: CreateDynamicObject(modelid, x, y, z, rx, ry, rz[, worldid = value, interiorid = value, playerid = value, streamdistance = value, drawdistance = value, areaid = value, priority = value]);
-    // Basic parameters (modelid, x, y, z, rx, ry, rz) are required, optional parameters in [] can be omitted
-    let positional_re = Regex::new(r"CreateDynamicObject\s*\(\s*(\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*(\d+))?\s*\)\s*;").map_err(|e| {
-        format!("Failed to create positional regex pattern: {}", e)
-    })?;
-
-    let named_re = Regex::new(r"CreateDynamicObject\s*\(\s*(\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*(?:,\s*worldid\s*=\s*([+-]?\d+))?\s*(?:,\s*interiorid\s*=\s*([+-]?\d+))?\s*(?:,\s*playerid\s*=\s*([+-]?\d+))?\s*(?:,\s*streamdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*drawdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*areaid\s*=\s*([+-]?\d+))?\s*(?:,\s*priority\s*=\s*(\d+))?\s*\)\s*;").map_err(|e| {
-        format!("Failed to create named regex pattern: {}", e)
-    })?;
-
-    let mut objects = Vec::new();
-    let mut errors = Vec::new();
-    let lines: Vec<&str> = content.lines().collect();
-    let mut parsed_count = 0;
-
-    for (line_num, line) in lines.iter().enumerate() {
-        let line = line.trim();
-
-        // Skip empty lines, single-line comments, includes, and other non-relevant content
-        if line.is_empty()
-            || line.starts_with("//")
-            || line.starts_with("#")
-            || line.starts_with("/*")
-            || line.starts_with("*")
-            || line.ends_with("*/")
-            || line.contains("hook ")
-            || line.contains("function ")
-            || line.contains("stock ")
-            || line.contains("public ")
-            || line.contains("return ")
-            || line.starts_with("{")
-            || line.starts_with("}")
-            || line.starts_with(")")
-            || (!line.contains("CreateDynamicObject") && !line.contains("createDynamicObject"))
-        {
-            continue;
-        }
-
-        // Try positional format first, then named format
-        let (captures, is_positional) = if let Some(cap) = positional_re.captures(line) {
-            (cap, true)
-        } else if let Some(cap) = named_re.captures(line) {
-            (cap, false)
-        } else {
-            // Don't report errors for lines that don't contain CreateDynamicObject calls
-            // This allows the parser to be more robust and ignore irrelevant content
-            continue;
-        };
-
-        match parse_create_dynamic_object(&captures, is_positional) {
-            Ok(obj) => {
-                objects.push(obj);
-                parsed_count += 1;
-            }
-            Err(e) => {
-                errors.push(format!("Line {}: {}", line_num + 1, e));
-            }
-        }
-    }
-
-    Ok(PwnImportResult {
-        objects,
-        line_count: lines.len(),
-        parsed_count,
-        errors,
-    })
+    parse_pwn_content(&content)
 }
 
 fn parse_create_dynamic_object(
@@ -1450,6 +1380,365 @@ fn parse_create_dynamic_object(
         drawdistance,
         areaid,
         priority,
+        invulnerable: None, // Objects don't have invulnerable
+        health: None,       // Objects don't have health
+    })
+}
+
+fn parse_create_dynamic_actor(
+    captures: &regex::Captures,
+    is_positional: bool,
+) -> Result<PwnObjectData, String> {
+    // Helper function to parse float values, handling constants
+    fn parse_float_or_constant(value: &str) -> Result<f32, String> {
+        match value.to_uppercase().as_str() {
+            "STREAMER_ACTOR_SD" => Ok(200.0), // Default stream distance for actors
+            _ => value
+                .parse::<f32>()
+                .map_err(|_| format!("Invalid float value: {}", value)),
+        }
+    }
+
+    // Helper function to parse optional integer values
+    fn parse_optional_i32(value: Option<&regex::Match>) -> Result<Option<i32>, String> {
+        match value {
+            Some(m) => {
+                let val = m
+                    .as_str()
+                    .parse::<i32>()
+                    .map_err(|_| format!("Invalid integer value: {}", m.as_str()))?;
+                Ok(Some(val))
+            }
+            None => Ok(None),
+        }
+    }
+
+    // Helper function to parse optional float values
+    fn parse_optional_f32(value: Option<&regex::Match>) -> Result<Option<f32>, String> {
+        match value {
+            Some(m) => {
+                let val = parse_float_or_constant(m.as_str())?;
+                Ok(Some(val))
+            }
+            None => Ok(None),
+        }
+    }
+
+    // Helper function to parse optional u32 values
+    fn parse_optional_u32(value: Option<&regex::Match>) -> Result<Option<u32>, String> {
+        match value {
+            Some(m) => {
+                let val = m
+                    .as_str()
+                    .parse::<u32>()
+                    .map_err(|_| format!("Invalid unsigned integer value: {}", m.as_str()))?;
+                Ok(Some(val))
+            }
+            None => Ok(None),
+        }
+    }
+
+    // Helper function to parse boolean values
+    fn parse_bool(value: &str) -> Result<bool, String> {
+        match value.to_lowercase().as_str() {
+            "true" | "1" => Ok(true),
+            "false" | "0" => Ok(false),
+            _ => Err(format!("Invalid boolean value: {}", value)),
+        }
+    }
+
+    let modelid = captures
+        .get(1)
+        .unwrap()
+        .as_str()
+        .parse::<u32>()
+        .map_err(|_| "Invalid model ID")?;
+
+    let x = parse_float_or_constant(captures.get(2).unwrap().as_str())?;
+    let y = parse_float_or_constant(captures.get(3).unwrap().as_str())?;
+    let z = parse_float_or_constant(captures.get(4).unwrap().as_str())?;
+    let r = parse_float_or_constant(captures.get(5).unwrap().as_str())?;
+
+    // For actors, we use the single rotation value for all three axes (rx=ry=rz=r)
+    let rx = r;
+    let ry = r;
+    let rz = r;
+
+    // Parse actor-specific fields and common parameters
+    let (invulnerable, health, worldid, interiorid, playerid, streamdistance, areaid, priority) =
+        if is_positional {
+            // Positional format: modelid, x, y, z, r, invulnerable, health, worldid, interiorid, playerid, streamdistance, areaid, priority
+            let invulnerable = captures.get(6).map(|m| parse_bool(m.as_str())).transpose()?;
+            let health = captures.get(7).map(|m| parse_float_or_constant(m.as_str())).transpose()?;
+            (
+                invulnerable,
+                health,
+                parse_optional_i32(captures.get(8).as_ref())?,    // worldid
+                parse_optional_i32(captures.get(9).as_ref())?,    // interiorid  
+                parse_optional_i32(captures.get(10).as_ref())?,   // playerid
+                parse_optional_f32(captures.get(11).as_ref())?,   // streamdistance
+                parse_optional_i32(captures.get(12).as_ref())?,   // areaid
+                parse_optional_u32(captures.get(13).as_ref())?,   // priority
+            )
+        } else {
+            // Named format: modelid, x, y, z, r, invulnerable = value, health = value, worldid = value, interiorid = value, playerid = value, streamdistance = value, areaid = value, priority = value
+            let invulnerable = captures.get(6).map(|m| parse_bool(m.as_str())).transpose()?;
+            let health = captures.get(7).map(|m| parse_float_or_constant(m.as_str())).transpose()?;
+            (
+                invulnerable,
+                health,
+                parse_optional_i32(captures.get(8).as_ref())?,    // worldid
+                parse_optional_i32(captures.get(9).as_ref())?,    // interiorid
+                parse_optional_i32(captures.get(10).as_ref())?,   // playerid
+                parse_optional_f32(captures.get(11).as_ref())?,   // streamdistance
+                parse_optional_i32(captures.get(12).as_ref())?,   // areaid
+                parse_optional_u32(captures.get(13).as_ref())?,   // priority
+            )
+        };
+
+    Ok(PwnObjectData {
+        modelid,
+        x,
+        y,
+        z,
+        rx,
+        ry,
+        rz,
+        worldid,
+        interiorid,
+        playerid,
+        streamdistance,
+        drawdistance: None, // Actors don't have drawdistance
+        areaid,
+            priority,
+            invulnerable,
+            health,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_create_dynamic_actor_positional() {
+        let content = r#"
+CreateDynamicActor(45, 100.0, 200.0, 15.0, 90.0, true, 100.0, -1, -1, -1, 200.0, -1, 0);
+CreateDynamicActor(123, 150.5, 250.3, 20.0, 45.0, false, 50.0, 0, 0, 0, 300.0, -1, 1);
+"#;
+
+        let result = parse_pwn_content(content).unwrap();
+        assert_eq!(result.parsed_count, 2);
+        assert_eq!(result.objects.len(), 2);
+        assert!(result.errors.is_empty());
+
+        // Test first actor
+        let obj1 = &result.objects[0];
+        assert_eq!(obj1.modelid, 45);
+        assert_eq!(obj1.x, 100.0);
+        assert_eq!(obj1.y, 200.0);
+        assert_eq!(obj1.z, 15.0);
+        assert_eq!(obj1.rx, 90.0); // Single rotation applied to all axes
+        assert_eq!(obj1.ry, 90.0);
+        assert_eq!(obj1.rz, 90.0);
+        assert_eq!(obj1.invulnerable, Some(true));
+        assert_eq!(obj1.health, Some(100.0));
+        assert_eq!(obj1.worldid, Some(-1));
+        assert_eq!(obj1.interiorid, Some(-1));
+        assert_eq!(obj1.playerid, Some(-1));
+        assert_eq!(obj1.streamdistance, Some(200.0));
+        assert_eq!(obj1.drawdistance, None); // Actors don't have drawdistance
+        assert_eq!(obj1.areaid, Some(-1));
+        assert_eq!(obj1.priority, Some(0));
+
+        // Test second actor
+        let obj2 = &result.objects[1];
+        assert_eq!(obj2.modelid, 123);
+        assert_eq!(obj2.x, 150.5);
+        assert_eq!(obj2.y, 250.3);
+        assert_eq!(obj2.z, 20.0);
+        assert_eq!(obj2.rx, 45.0);
+        assert_eq!(obj2.ry, 45.0);
+        assert_eq!(obj2.rz, 45.0);
+        assert_eq!(obj2.invulnerable, Some(false));
+        assert_eq!(obj2.health, Some(50.0));
+        assert_eq!(obj2.worldid, Some(0));
+        assert_eq!(obj2.interiorid, Some(0));
+        assert_eq!(obj2.playerid, Some(0));
+        assert_eq!(obj2.streamdistance, Some(300.0));
+        assert_eq!(obj2.drawdistance, None);
+        assert_eq!(obj2.areaid, Some(-1));
+        assert_eq!(obj2.priority, Some(1));
+    }
+
+    #[test]
+    fn test_parse_create_dynamic_actor_named() {
+        let content = r#"
+CreateDynamicActor(89, 75.0, 125.0, 10.0, 270.0, invulnerable = true, health = 90.0, worldid = 1, interiorid = 5, playerid = 2, streamdistance = 400.0, areaid = -1, priority = 2);
+"#;
+
+        let result = parse_pwn_content(content).unwrap();
+        assert_eq!(result.parsed_count, 1);
+        assert_eq!(result.objects.len(), 1);
+        assert!(result.errors.is_empty());
+
+        let obj = &result.objects[0];
+        assert_eq!(obj.modelid, 89);
+        assert_eq!(obj.x, 75.0);
+        assert_eq!(obj.y, 125.0);
+        assert_eq!(obj.z, 10.0);
+        assert_eq!(obj.rx, 270.0);
+        assert_eq!(obj.ry, 270.0);
+        assert_eq!(obj.rz, 270.0);
+        assert_eq!(obj.invulnerable, Some(true));
+        assert_eq!(obj.health, Some(90.0));
+        assert_eq!(obj.worldid, Some(1));
+        assert_eq!(obj.interiorid, Some(5));
+        assert_eq!(obj.playerid, Some(2));
+        assert_eq!(obj.streamdistance, Some(400.0));
+        assert_eq!(obj.drawdistance, None);
+        assert_eq!(obj.areaid, Some(-1));
+        assert_eq!(obj.priority, Some(2));
+    }
+
+    #[test]
+    fn test_parse_mixed_objects_and_actors() {
+        let content = r#"
+CreateDynamicObject(11731, -2.8355, 0.0000, -2.7752, 0.0000, 0.0000, 0.0000, -1, -1, -1, 200, 0, -1, 0);
+CreateDynamicActor(45, 100.0, 200.0, 15.0, 90.0, true, 100.0);
+"#;
+
+        let result = parse_pwn_content(content).unwrap();
+        assert_eq!(result.parsed_count, 2);
+        assert_eq!(result.objects.len(), 2);
+        assert!(result.errors.is_empty());
+
+        // Test object
+        let obj1 = &result.objects[0];
+        assert_eq!(obj1.modelid, 11731);
+        assert_eq!(obj1.invulnerable, None); // Objects don't have invulnerable
+        assert_eq!(obj1.health, None);       // Objects don't have health
+
+        // Test actor
+        let obj2 = &result.objects[1];
+        assert_eq!(obj2.modelid, 45);
+        assert_eq!(obj2.invulnerable, Some(true));
+        assert_eq!(obj2.health, Some(100.0));
+    }
+}
+
+// Helper function to parse PWN content directly (used for testing and main parsing)
+pub(crate) fn parse_pwn_content(content: &str) -> Result<PwnImportResult, String> {
+    use regex::Regex;
+
+    // Remove multi-line comments first
+    let multiline_comment_re = Regex::new(r"/\*[\s\S]*?\*/")
+        .map_err(|e| format!("Failed to create multiline comment regex: {}", e))?;
+    let content = multiline_comment_re.replace_all(&content, "");
+
+    // Regex patterns for CreateDynamicObject (3 rotations: rx, ry, rz)
+    // Positional format: CreateDynamicObject(modelid, x, y, z, rx, ry, rz[, worldid, interiorid, playerid, streamdistance, drawdistance, areaid, priority]);
+    let object_positional_re = Regex::new(r"CreateDynamicObject\s*\(\s*(\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*(\d+))?\s*\)\s*;").map_err(|e| {
+        format!("Failed to create object positional regex pattern: {}", e)
+    })?;
+
+    // Named format: CreateDynamicObject(modelid, x, y, z, rx, ry, rz[, worldid = value, interiorid = value, playerid = value, streamdistance = value, drawdistance = value, areaid = value, priority = value]);
+    let object_named_re = Regex::new(r"CreateDynamicObject\s*\(\s*(\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*(?:,\s*worldid\s*=\s*([+-]?\d+))?\s*(?:,\s*interiorid\s*=\s*([+-]?\d+))?\s*(?:,\s*playerid\s*=\s*([+-]?\d+))?\s*(?:,\s*streamdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*drawdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*areaid\s*=\s*([+-]?\d+))?\s*(?:,\s*priority\s*=\s*(\d+))?\s*\)\s*;").map_err(|e| {
+        format!("Failed to create object named regex pattern: {}", e)
+    })?;
+
+    // Regex patterns for CreateDynamicActor (1 rotation: r, plus invulnerable and health)
+    // Positional format: CreateDynamicActor(modelid, x, y, z, r, invulnerable, health[, worldid, interiorid, playerid, streamdistance, areaid, priority]);
+    let actor_positional_re = Regex::new(r"CreateDynamicActor\s*\(\s*(\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*(true|false|1|0)\s*,\s*([+-]?\d*\.?\d+)\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*([+-]?\d+))?\s*(?:,\s*(\d+))?\s*\)\s*;").map_err(|e| {
+        format!("Failed to create actor positional regex pattern: {}", e)
+    })?;
+
+    // Named format: CreateDynamicActor(modelid, x, y, z, r, invulnerable = true, health = 100.0, worldid = 0, interiorid = -1, playerid = -1, streamdistance = STREAMER_ACTOR_SD, areaid = STREAMER_TAG_AREA:-1, priority = 0);
+    let actor_named_re = Regex::new(r"CreateDynamicActor\s*\(\s*(\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*(?:,\s*invulnerable\s*=\s*(true|false|1|0))?\s*(?:,\s*health\s*=\s*([+-]?\d*\.?\d+))?\s*(?:,\s*worldid\s*=\s*([+-]?\d+))?\s*(?:,\s*interiorid\s*=\s*([+-]?\d+))?\s*(?:,\s*playerid\s*=\s*([+-]?\d+))?\s*(?:,\s*streamdistance\s*=\s*([+-]?\d*\.?\d+|[A-Z_]+))?\s*(?:,\s*areaid\s*=\s*([+-]?\d+))?\s*(?:,\s*priority\s*=\s*(\d+))?\s*\)\s*;").map_err(|e| {
+        format!("Failed to create actor named regex pattern: {}", e)
+    })?;
+
+    let mut objects = Vec::new();
+    let mut errors = Vec::new();
+    let lines: Vec<&str> = content.lines().collect();
+    let mut parsed_count = 0;
+
+    for (line_num, line) in lines.iter().enumerate() {
+        let line = line.trim();
+
+        // Skip empty lines, single-line comments, includes, and other non-relevant content
+        if line.is_empty()
+            || line.starts_with("//")
+            || line.starts_with("#")
+            || line.starts_with("/*")
+            || line.starts_with("*")
+            || line.ends_with("*/")
+            || line.contains("hook ")
+            || line.contains("function ")
+            || line.contains("stock ")
+            || line.contains("public ")
+            || line.contains("return ")
+            || line.starts_with("{")
+            || line.starts_with("}")
+            || line.starts_with(")")
+            || (!line.contains("CreateDynamicObject") && !line.contains("createDynamicObject") && !line.contains("CreateDynamicActor") && !line.contains("createDynamicActor"))
+        {
+            continue;
+        }
+
+        // Try CreateDynamicObject patterns first
+        if let Some(cap) = object_positional_re.captures(line) {
+            match parse_create_dynamic_object(&cap, true) {
+                Ok(obj) => {
+                    objects.push(obj);
+                    parsed_count += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("Line {}: {}", line_num + 1, e));
+                }
+            }
+        } else if let Some(cap) = object_named_re.captures(line) {
+            match parse_create_dynamic_object(&cap, false) {
+                Ok(obj) => {
+                    objects.push(obj);
+                    parsed_count += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("Line {}: {}", line_num + 1, e));
+                }
+            }
+        } else if let Some(cap) = actor_positional_re.captures(line) {
+            match parse_create_dynamic_actor(&cap, true) {
+                Ok(obj) => {
+                    objects.push(obj);
+                    parsed_count += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("Line {}: {}", line_num + 1, e));
+                }
+            }
+        } else if let Some(cap) = actor_named_re.captures(line) {
+            match parse_create_dynamic_actor(&cap, false) {
+                Ok(obj) => {
+                    objects.push(obj);
+                    parsed_count += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("Line {}: {}", line_num + 1, e));
+                }
+            }
+        } else {
+            // Don't report errors for lines that don't contain CreateDynamicObject or CreateDynamicActor calls
+            // This allows the parser to be more robust and ignore irrelevant content
+            continue;
+        }
+    }
+
+    Ok(PwnImportResult {
+        objects,
+        line_count: lines.len(),
+        parsed_count,
+        errors,
     })
 }
 

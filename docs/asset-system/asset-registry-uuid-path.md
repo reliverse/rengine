@@ -286,7 +286,7 @@ class AssetScanner {
     [AssetType.MODEL, ['.gltf', '.glb', '.obj', '.fbx', '.dae']],
     [AssetType.AUDIO, ['.wav', '.mp3', '.ogg', '.m4a']],
     [AssetType.SCRIPT, ['.js', '.ts', '.lua']],
-    [AssetType.SCENE, ['.rengine']],
+    [AssetType.SCENE, ['.json']],
     [AssetType.ANIMATION, ['.anim', '.fbx']],
   ]);
 

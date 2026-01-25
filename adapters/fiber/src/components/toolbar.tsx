@@ -110,7 +110,7 @@ export function Toolbar() {
   const generateAutoSaveFilename = (): string => {
     const now = new Date();
     const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-");
-    return `auto_${timestamp}.rengine`;
+    return `auto_${timestamp}.json`;
   };
 
   const {

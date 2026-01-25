@@ -88,28 +88,5 @@
   "bugs": {
     "url": "https://github.com/reliverse/rengine/issues"
   },
-  "homepage": "https://github.com/reliverse/rengine#readme",
-  "engines": {
-    "rust": ">=1.70.0"
-  },
-  "rust": {
-    "edition": "2024",
-    "toolchain": "stable"
-  },
-  "files": [
-    "Cargo.toml",
-    "Cargo.lock",
-    "src/",
-    "README.md"
-  ],
-  "preferGlobal": false,
-  "os": [
-    "linux",
-    "darwin",
-    "win32"
-  ],
-  "cpu": [
-    "x64",
-    "arm64"
-  ]
+  "homepage": "https://github.com/reliverse/rengine#readme"
 }
