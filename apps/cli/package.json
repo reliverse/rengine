@@ -1,0 +1,23 @@
+{
+    "name": "@reliverse/rengine",
+    "description": "Rengine is an open-source 2D and 3D game engine for building games, interactive tools, and content creation workflows.",
+    "author": "Nazarii Korniienko <blefnk@gmail.com>",
+    "version": "0.0.1",
+    "type": "module",
+    "private": false,
+    "files": [
+        "src",
+        "package.json"
+    ],
+    "scripts": {
+        "typecheck": "tsgo --noEmit"
+    },
+    "dependencies": {
+        "@reliverse/rengine-core": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "@repo/tsconfig": "workspace:*"
+    }
+}

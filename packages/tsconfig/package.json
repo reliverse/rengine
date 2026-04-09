@@ -1,0 +1,16 @@
+{
+  "name": "@repo/tsconfig",
+  "description": "Shared TypeScript configuration",
+  "author": "Nazarii Korniienko <blefnk@gmail.com>",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "./tsx-support.json",
+    "./ts-files-only.json"
+  ],
+  "type": "module",
+  "exports": {
+    "./ts-files-only.json": "./ts-files-only.json",
+    "./tsx-support.json": "./tsx-support.json"
+  }
+}

@@ -1,0 +1,24 @@
+{
+    "name": "@reliverse/rengine-core",
+    "description": "Shared runtime primitives and contracts for Rengine game engine",
+    "author": "Nazarii Korniienko <blefnk@gmail.com>",
+    "version": "0.0.1",
+    "type": "module",
+    "private": false,
+    "files": [
+        "src",
+        "package.json"
+    ],
+    "exports": {
+        ".": "./src/mod.ts"
+    },
+    "scripts": {
+        "typecheck": "tsgo --noEmit"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "@repo/tsconfig": "workspace:*"
+    }
+}

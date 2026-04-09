@@ -1,0 +1,28 @@
+{
+  "name": "@reliverse/rese",
+  "description": "Rese is an open-source runtime-first desktop app framework, which includes headless control plane, strong internal tooling, and agent-ready workflows.",
+  "author": "Nazarii Korniienko <blefnk@gmail.com>",
+  "version": "0.0.1",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "rese": "./src/cli.ts"
+  },
+  "files": [
+    "src",
+    "package.json"
+  ],
+  "scripts": {
+    "dev": "bun run ./src/cli.ts",
+    "build": "bun build ./src/cli.ts --outdir ./dist --target bun",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@reliverse/rese-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "@repo/tsconfig": "workspace:*"
+  }
+}
