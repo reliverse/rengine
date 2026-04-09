@@ -1,1 +1,0 @@
-The structure of the future `reliverse/rese` repository currently lives inside the `reliverse/rengine` repository. This is intentional, to stabilize `rese` within a complex, real-world production project. Once `rengine` becomes stable, `rese` will be moved to a separate repository. The project is licensed under the MIT License.

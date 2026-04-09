@@ -1,7 +1,7 @@
 export type RengineSurface = "cli" | "wiki";
 
 export type RenginePackageRole =
-  | "control-plane-cli"
+  | "game-engine-cli"
   | "docs-wiki"
   | "runtime-core";
 
@@ -12,12 +12,12 @@ export type RengineWorkspacePackage = {
   private: boolean;
 };
 
-export type RengineControlPlaneFeature = "terminal" | "streams";
+export type RengineGameEngineFeature = "terminal" | "streams";
 
-export type RengineControlPlaneManifest = {
+export type RengineGameEngineManifest = {
   name: "rengine";
   version: string;
-  mode: "headless-first-control-plane";
-  features: readonly RengineControlPlaneFeature[];
+  mode: "headless-first-game-engine";
+  features: readonly RengineGameEngineFeature[];
   packages: readonly RengineWorkspacePackage[];
 };

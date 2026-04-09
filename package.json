@@ -18,15 +18,14 @@
         ]
     },
     "scripts": {
-        "typecheck": "bun -F='*' typecheck",
+        "typecheck": "bun -F='*' run typecheck",
+        "build": "bun -F='*' run build",
         "clean": "./scripts/clean.sh",
         "fresh": "bun run clean && bun install",
         "rese:dev": "bun run --filter='@reliverse/rese' dev",
         "rese:dev:cli": "bun run --filter='@reliverse/rese' dev",
         "rese:dev:web": "bun run --filter='@repo/rese-web' dev",
-        "rese:dev:wiki": "bun run --filter='@repo/rese-wiki' dev",
-        "rese:build": "bun run --filter='@reliverse/rese' build && bun run --filter='@repo/rese-web' build && bun run --filter='@repo/rese-wiki' build && bun run --filter='@reliverse/rese-core' build",
-        "rese:typecheck": "bun run --filter='@reliverse/rese' typecheck && bun run --filter='@repo/rese-web' typecheck && bun run --filter='@repo/rese-wiki' typecheck && bun run --filter='@reliverse/rese-core' typecheck"
+        "rese:dev:wiki": "bun run --filter='@repo/rese-wiki' dev"
     },
     "packageManager": "bun@1.3.11",
     "engines": {

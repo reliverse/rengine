@@ -1,19 +1,19 @@
-import type { RengineControlPlaneManifest, RengineWorkspacePackage } from "./contracts";
+import type { RengineGameEngineManifest, RengineWorkspacePackage } from "./contracts";
 
 export type {
-  RengineControlPlaneFeature,
-  RengineControlPlaneManifest,
+  RengineGameEngineFeature,
+  RengineGameEngineManifest,
   RenginePackageRole,
   RengineSurface,
   RengineWorkspacePackage,
 } from "./contracts";
 export type { RengineRuntimePlaceholder } from "./runtime";
 export { createRengineRuntimePlaceholder } from "./runtime";
-
+ 
 export const rengineWorkspacePackages: readonly RengineWorkspacePackage[] = [
   {
     name: "@reliverse/rengine",
-    role: "control-plane-cli",
+    role: "game-engine-cli",
     surface: "cli",
     private: false,
   },
@@ -31,10 +31,10 @@ export const rengineWorkspacePackages: readonly RengineWorkspacePackage[] = [
   },
 ] as const;
 
-export const rengineControlPlaneManifest: RengineControlPlaneManifest = {
+export const rengineGameEngineManifest: RengineGameEngineManifest = {
   name: "rengine",
   version: "0.0.1",
-  mode: "headless-first-control-plane",
+  mode: "headless-first-game-engine",
   features: ["terminal", "streams"],
   packages: rengineWorkspacePackages,
 };

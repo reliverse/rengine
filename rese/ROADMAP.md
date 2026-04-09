@@ -8,8 +8,8 @@ Goal: ship the first usable `rese` experience as a headless-first VPS control pl
 
 ### 0.0.1
 
-- [ ] `chore(repo): scaffold initial rengine monorepo structure with rese`
-- [ ] `docs(rese): define v0.1.0 scope as a headless-first control plane`
+- [x] `chore(repo): scaffold initial rengine monorepo structure with rese`
+- [x] `docs(rese): define v0.1.0 scope as a headless-first control plane`
 - [ ] `chore(web): initialize shadcn/ui app shell for Rese Control Plane`
 - [ ] `feat(layout): add initial dashboard layout with sidebar and topbar`
 - [ ] `docs(roadmap): add patch-version milestone plan toward v0.1.0`
